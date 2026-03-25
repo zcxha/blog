@@ -1,0 +1,50 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+<head>
+  <title>{{.Title}}</title>
+  <meta property="og:title" content="{{.Title}}">
+  {{template "head_common" .}}
+</head>
+<body class="page-home">
+  <main class="container">
+    <header class="page-header">
+      <h1>{{.SEO.SiteName}}</h1>
+      <p class="subtitle">{{.SiteDescription}}</p>
+      {{template "site_nav_top" .}}
+    </header>
+
+    <section class="post-list">
+      {{if .Posts}}
+      {{range .Posts}}
+      <a class="post-card-link" href="{{$.BasePath}}/post/{{.Slug}}">
+        <article class="post-card">
+          <h2>{{.Title}}</h2>
+          <p class="meta">{{.DateDisplay}}{{if .Author}} &middot; {{.Author}}{{end}}</p>
+          {{if .Tags}}
+          <p class="tags">
+            {{range .Tags}}<span>#{{.}}</span>{{end}}
+          </p>
+          {{end}}
+        </article>
+      </a>
+      {{end}}
+      {{else}}
+      <p class="empty">暂无文章，先写一篇吧。</p>
+      {{end}}
+    </section>
+
+    {{if gt .Pagination.TotalPages 1}}
+    <nav class="pagination" aria-label="分页导航">
+      {{if .Pagination.PrevURL}}<a class="page-btn" href="{{.Pagination.PrevURL}}">上一页</a>{{else}}<span class="page-btn disabled">上一页</span>{{end}}
+      <div class="page-list">
+        {{range .Pagination.Pages}}
+        <a class="page-num {{if .Current}}current{{end}}" href="{{.URL}}">{{.Number}}</a>
+        {{end}}
+      </div>
+      {{if .Pagination.NextURL}}<a class="page-btn" href="{{.Pagination.NextURL}}">下一页</a>{{else}}<span class="page-btn disabled">下一页</span>{{end}}
+    </nav>
+    {{end}}
+  </main>
+</body>
+</html>
+

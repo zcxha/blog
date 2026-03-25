@@ -1,0 +1,94 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+<head>
+  <title>{{.Title}} - {{.SEO.SiteName}}</title>
+  <meta property="og:title" content="{{.Title}} - {{.SEO.SiteName}}">
+  {{template "head_common" .}}
+</head>
+<body class="page-tags" data-base-path="{{.BasePath}}">
+  <div class="sparkle sparkle-a"></div>
+  <div class="sparkle sparkle-b"></div>
+  <main class="container">
+    <header class="page-header tags-hero">
+      <p class="kicker">Discover</p>
+      <h1>标签速览</h1>
+      <p class="subtitle">先筛主题，再读文章。节奏更快，也更聚焦。</p>
+      {{template "site_nav_top" .}}
+    </header>
+
+    <section class="layout-split tags-layout">
+      <aside class="side-panel tags-filter">
+        <h3>主题过滤</h3>
+        <p class="meta tags-filter-meta">共 {{len .Tags}} 个标签</p>
+        <div class="chip-list tags-chip-list">
+          <a class="chip {{if eq .CurrentTag ""}}active{{end}}" href="{{.BasePath}}/tags">全部</a>
+          {{range .Tags}}
+          <a class="chip {{if eq $.CurrentTag .Name}}active{{end}}" href="{{.URL}}">{{.Name}} ({{.Count}})</a>
+          {{end}}
+        </div>
+      </aside>
+
+      <div class="main-panel tags-main">
+        <section class="tags-focus">
+          {{if .CurrentTag}}
+          <p class="kicker">Current Tag</p>
+          <h2>#{{.CurrentTag}}</h2>
+          <p class="meta">当前结果：{{len .Posts}} 篇</p>
+          {{else}}
+          <p class="kicker">All Tags</p>
+          <h2>全部文章</h2>
+          <p class="meta">当前结果：{{len .Posts}} 篇</p>
+          {{end}}
+        </section>
+
+        <section class="post-grid">
+          {{if .Posts}}
+          {{range .Posts}}
+          <a class="post-card-link" href="{{$.BasePath}}/post/{{.Slug}}">
+            <article class="post-card">
+              <p class="meta">{{.DateDisplay}}</p>
+              <h3>{{.Title}}</h3>
+            </article>
+          </a>
+          {{end}}
+          {{else}}
+          <p class="empty">这个标签下还没有内容。</p>
+          {{end}}
+        </section>
+
+        {{if gt .Pagination.TotalPages 1}}
+        <nav class="pagination" aria-label="分页导航">
+          {{if .Pagination.PrevURL}}<a class="page-btn" href="{{.Pagination.PrevURL}}">上一页</a>{{else}}<span class="page-btn disabled">上一页</span>{{end}}
+          <div class="page-list">
+            {{range .Pagination.Pages}}
+            <a class="page-num {{if .Current}}current{{end}}" href="{{.URL}}">{{.Number}}</a>
+            {{end}}
+          </div>
+          {{if .Pagination.NextURL}}<a class="page-btn" href="{{.Pagination.NextURL}}">下一页</a>{{else}}<span class="page-btn disabled">下一页</span>{{end}}
+        </nav>
+        {{end}}
+      </div>
+    </section>
+  </main>
+
+  <script>
+    (function () {
+      const body = document.body;
+      const basePath = body.dataset.basePath || "";
+      const ref = document.referrer;
+      let fromTagPage = false;
+
+      try {
+        if (ref) {
+          const prev = new URL(ref);
+          const cur = new URL(window.location.href);
+          const prefix = `${cur.origin}${basePath}/tags`;
+          fromTagPage = prev.href.startsWith(prefix);
+        }
+      } catch (_) {}
+
+      body.classList.add(fromTagPage ? "tags-no-enter" : "tags-enter");
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,206 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+<head>
+  <title>{{.Title}} - {{.SEO.SiteName}}</title>
+  <meta property="og:title" content="{{.Title}} - {{.SEO.SiteName}}">
+  {{template "head_common" .}}
+</head>
+<body class="page-search">
+  <main class="container">
+    <header class="page-header">
+      <h1>搜索</h1>
+      <p class="subtitle">按标题、标签和正文搜索。</p>
+      {{template "site_nav_top" .}}
+    </header>
+
+    <section class="search-panel" data-base-path="{{.BasePath}}">
+      <input id="q" class="search-input" type="search" placeholder="输入关键词（标题、标签、正文）">
+      <p id="search-meta" class="meta">输入关键词后开始搜索。</p>
+      <div id="search-results" class="post-list"></div>
+      <nav id="search-pagination" class="pagination" aria-label="搜索分页"></nav>
+    </section>
+  </main>
+
+  <script>
+    (async function () {
+      const panel = document.querySelector(".search-panel");
+      const basePath = panel?.dataset.basePath || "";
+      const input = document.getElementById("q");
+      const meta = document.getElementById("search-meta");
+      const results = document.getElementById("search-results");
+      const pagination = document.getElementById("search-pagination");
+      const pageSize = 10;
+      let docs = [];
+      let matched = [];
+      let currentPage = 1;
+
+      function escapeHtml(str) {
+        return str
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/\"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+
+      function highlight(text, keyword) {
+        if (!keyword) return escapeHtml(text || "");
+        const escaped = escapeHtml(text || "");
+        const safeKeyword = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const re = new RegExp(`(${safeKeyword})`, "ig");
+        return escaped.replace(re, "<mark>$1</mark>");
+      }
+
+      function makeSnippet(content, keyword) {
+        const raw = content || "";
+        if (!keyword) return escapeHtml(raw.slice(0, 120));
+        const lower = raw.toLowerCase();
+        const idx = lower.indexOf(keyword.toLowerCase());
+        if (idx === -1) {
+          return highlight(raw.slice(0, 120), keyword);
+        }
+        const start = Math.max(0, idx - 36);
+        const end = Math.min(raw.length, idx + keyword.length + 64);
+        const prefix = start > 0 ? "..." : "";
+        const suffix = end < raw.length ? "..." : "";
+        return prefix + highlight(raw.slice(start, end), keyword) + suffix;
+      }
+
+      function setURL(keyword, page) {
+        const url = new URL(window.location.href);
+        if (keyword) {
+          url.searchParams.set("q", keyword);
+        } else {
+          url.searchParams.delete("q");
+        }
+        if (page > 1) {
+          url.searchParams.set("p", String(page));
+        } else {
+          url.searchParams.delete("p");
+        }
+        history.replaceState({}, "", url);
+      }
+
+      function renderPagination(totalPages, page, keyword) {
+        if (totalPages <= 1) {
+          pagination.innerHTML = "";
+          return;
+        }
+        let html = "";
+        if (page > 1) {
+          html += `<a class="page-btn" href="#" data-page="${page - 1}">上一页</a>`;
+        } else {
+          html += `<span class="page-btn disabled">上一页</span>`;
+        }
+        html += `<div class="page-list">`;
+        for (let i = 1; i <= totalPages; i++) {
+          html += `<a class="page-num ${i === page ? "current" : ""}" href="#" data-page="${i}">${i}</a>`;
+        }
+        html += `</div>`;
+        if (page < totalPages) {
+          html += `<a class="page-btn" href="#" data-page="${page + 1}">下一页</a>`;
+        } else {
+          html += `<span class="page-btn disabled">下一页</span>`;
+        }
+        pagination.innerHTML = html;
+        pagination.querySelectorAll("a[data-page]").forEach((el) => {
+          el.addEventListener("click", (e) => {
+            e.preventDefault();
+            currentPage = Number(el.dataset.page || "1");
+            render(keyword);
+          });
+        });
+      }
+
+      function render(keyword) {
+        if (!keyword) {
+          meta.textContent = "输入关键词后开始搜索。";
+          results.innerHTML = "";
+          pagination.innerHTML = "";
+          return;
+        }
+
+        const total = matched.length;
+        if (!total) {
+          meta.textContent = "找到 0 条结果";
+          results.innerHTML = `
+            <div class="empty">
+              <p>没有匹配结果。</p>
+              <p class="meta">试试更短关键词、近义词，或直接按标签搜索。</p>
+            </div>
+          `;
+          pagination.innerHTML = "";
+          return;
+        }
+
+        const totalPages = Math.ceil(total / pageSize);
+        if (currentPage < 1) currentPage = 1;
+        if (currentPage > totalPages) currentPage = totalPages;
+        const start = (currentPage - 1) * pageSize;
+        const end = start + pageSize;
+        const pageDocs = matched.slice(start, end);
+        meta.textContent = `找到 ${total} 条结果，第 ${currentPage}/${totalPages} 页`;
+
+        results.innerHTML = pageDocs.map((doc) => {
+          const snippet = makeSnippet(doc.content || "", keyword);
+          const tags = (doc.tags || []).map((t) => `<span>#${highlight(t, keyword)}</span>`).join("");
+          return `
+            <a class="post-card-link" href="${basePath}/post/${encodeURIComponent(doc.slug)}">
+              <article class="post-card">
+                <h2>${highlight(doc.title || "", keyword)}</h2>
+                <p class="meta">${escapeHtml(doc.date || "")}</p>
+                ${tags ? `<p class="tags">${tags}</p>` : ""}
+                ${snippet ? `<p class="snippet">${snippet}</p>` : ""}
+              </article>
+            </a>
+          `;
+        }).join("");
+
+        renderPagination(totalPages, currentPage, keyword);
+        setURL(keyword, currentPage);
+      }
+
+      try {
+        const resp = await fetch(`${basePath}/search-index.json`, { cache: "no-store" });
+        docs = await resp.json();
+      } catch (err) {
+        meta.textContent = "搜索索引加载失败。";
+        return;
+      }
+
+      const run = () => {
+        const keyword = input.value.trim().toLowerCase();
+        if (!keyword) {
+          matched = [];
+          currentPage = 1;
+          render("");
+          setURL("", 1);
+          return;
+        }
+        matched = docs.filter((doc) => {
+          const hay = `${doc.title || ""} ${(doc.tags || []).join(" ")} ${doc.content || ""}`.toLowerCase();
+          return hay.includes(keyword);
+        });
+        currentPage = 1;
+        render(keyword);
+      };
+
+      input.addEventListener("input", run);
+
+      const initial = new URL(window.location.href).searchParams.get("q");
+      if (initial) {
+        input.value = initial;
+        const initialPage = Number(new URL(window.location.href).searchParams.get("p") || "1");
+        if (Number.isFinite(initialPage) && initialPage > 0) {
+          currentPage = Math.floor(initialPage);
+        }
+        matched = docs.filter((doc) => {
+          const hay = `${doc.title || ""} ${(doc.tags || []).join(" ")} ${doc.content || ""}`.toLowerCase();
+          return hay.includes(initial.toLowerCase());
+        });
+        render(initial.toLowerCase());
+      }
+    })();
+  </script>
+</body>
+</html>
