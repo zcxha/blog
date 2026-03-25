@@ -207,6 +207,50 @@ draft body`)
 	}
 }
 
+func TestLoadPostRendersReferenceLinksAndIndentedLists(t *testing.T) {
+	tmp := t.TempDir()
+	postPath := filepath.Join(tmp, "sample.md")
+	mustWriteFile(t, postPath, `---
+title: "Sample"
+date: "2026-03-26"
+draft: false
+---
+起始 [文档][ref]。
+
+1. 外层条目
+
+   对齐段落
+
+2. 含嵌套列表
+
+   1. 子条目
+
+      - 子子条目
+
+[ref]: https://example.com/doc
+`)
+
+	post, err := core.LoadPost(postPath, "fallback")
+	if err != nil {
+		t.Fatalf("LoadPost error: %v", err)
+	}
+
+	html := strings.Join(strings.Fields(string(post.HTML)), " ")
+	checks := []string{
+		`<a href="https://example.com/doc">文档</a>`,
+		`<li><p>外层条目</p> <p>对齐段落</p></li>`,
+		`<li><p>含嵌套列表</p> <ol>`,
+		`<li><p>子条目</p> <ul>`,
+		`<li><p>子子条目</p></li>`,
+		`<section class="references"> <h2>参考文献</h2> <ul> <li><span class="reference-label">[ref]</span> <a href="https://example.com/doc">https://example.com/doc</a></li> </ul> </section>`,
+	}
+	for _, check := range checks {
+		if !strings.Contains(html, check) {
+			t.Fatalf("expected html to contain %q, got: %s", check, html)
+		}
+	}
+}
+
 func TestSearchIndexJSONShape(t *testing.T) {
 	docs := core.MakeSearchDocs([]core.Post{
 		{Title: "t", Slug: "s", DateDisplay: "2026-03-01", Tags: []string{"x"}, Markdown: "hello"},

@@ -244,6 +244,24 @@ body.page-search .back-nav a:nth-child(4) {
   margin: 10px 0 12px 24px;
 }
 
+.content li > p {
+  margin: 8px 0;
+}
+
+.content li > :first-child {
+  margin-top: 0;
+}
+
+.content li > :last-child {
+  margin-bottom: 0;
+}
+
+.content li > ul,
+.content li > ol {
+  margin-top: 8px;
+  margin-bottom: 8px;
+}
+
 .content blockquote {
   margin: 16px 0;
   border-left: 3px solid var(--line-strong);
@@ -285,6 +303,31 @@ body.page-search .back-nav a:nth-child(4) {
   color: #2d2a24;
   text-decoration-thickness: 1px;
   text-underline-offset: 2px;
+}
+
+.references {
+  margin-top: 28px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.references h2 {
+  margin: 0 0 10px;
+}
+
+.references ul {
+  margin: 0;
+  padding-left: 0;
+  list-style: none;
+}
+
+.references li {
+  margin: 8px 0;
+}
+
+.reference-label {
+  color: var(--muted);
+  margin-right: 8px;
 }
 
 .chip-list {
