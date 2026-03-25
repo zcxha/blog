@@ -221,9 +221,11 @@ draft: false
 
    对齐段落
 
-2. 含嵌套列表
+   1. 这行应当按续行保留，而不是子列表
 
-   1. 子条目
+2. 含缩进列表
+
+   2. 子条目说明
 
       - 子子条目
 
@@ -238,9 +240,8 @@ draft: false
 	html := strings.Join(strings.Fields(string(post.HTML)), " ")
 	checks := []string{
 		`<a href="https://example.com/doc">文档</a>`,
-		`<li><p>外层条目</p> <p>对齐段落</p></li>`,
-		`<li><p>含嵌套列表</p> <ol>`,
-		`<li><p>子条目</p> <ul>`,
+		`<li><p>外层条目</p> <p>对齐段落</p> <p>1. 这行应当按续行保留，而不是子列表</p></li>`,
+		`<li><p>含缩进列表</p> <p>2. 子条目说明</p> <ul>`,
 		`<li><p>子子条目</p></li>`,
 		`<section class="references"> <h2>参考文献</h2> <ul> <li><span class="reference-label">[ref]</span> <a href="https://example.com/doc">https://example.com/doc</a></li> </ul> </section>`,
 	}

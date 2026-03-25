@@ -847,7 +847,7 @@ func renderMarkdownBlocks(out *strings.Builder, lines []markdownLine, idx *int, 
 			continue
 		}
 
-		if item, ok := parseListItem(raw); ok {
+		if item, ok := parseListItem(raw); ok && (baseIndent == 0 || item.indent > 0) {
 			flushParagraph()
 			renderList(out, lines, idx, baseIndent, item.indent, item.tag, refs)
 			continue
