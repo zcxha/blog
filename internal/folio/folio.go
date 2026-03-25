@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"html"
 	"html/template"
 	"net/url"
 	"os"
@@ -81,12 +80,10 @@ type ArchiveGroup struct {
 }
 
 var (
-	reRefDef  = regexp.MustCompile(`^\s*\[([^\]]+)\]\s*:\s*(<[^>]+>|[^\s]+)\s*(?:"[^"]*"|'[^']*'|\([^\)]*\))?\s*$`)
-	reRefLink = regexp.MustCompile(`\[(.+?)\]\[([^\]]*)\]`)
-	reLink    = regexp.MustCompile(`\[(.+?)\]\(([^)\s]+)\)`)
-	reBold    = regexp.MustCompile(`\*\*(.+?)\*\*`)
-	reItalic  = regexp.MustCompile(`\*(.+?)\*`)
-	reCode    = regexp.MustCompile("`([^`]+)`")
+	reLink   = regexp.MustCompile(`\[(.+?)\]\(([^)\s]+)\)`)
+	reBold   = regexp.MustCompile(`\*\*(.+?)\*\*`)
+	reItalic = regexp.MustCompile(`\*(.+?)\*`)
+	reCode   = regexp.MustCompile("`([^`]+)`")
 )
 
 func DefaultConfig() AppConfig {
@@ -678,7 +675,6 @@ func renderMarkdown(input string) string {
 		return ""
 	}
 
-	cleaned, refs := extractReferenceDefinitions(input)
 	scanner := bufio.NewScanner(strings.NewReader(input))
 	var out strings.Builder
 	inCode := false
@@ -695,12 +691,11 @@ func renderMarkdown(input string) string {
 		if len(paragraph) == 0 {
 			return
 		}
-		text := formatInline(strings.Join(paragraph, " "), refs)
+		text := formatInline(strings.Join(paragraph, " "))
 		out.WriteString("<p>" + text + "</p>\n")
 		paragraph = paragraph[:0]
 	}
 
-	scanner = bufio.NewScanner(strings.NewReader(cleaned))
 	for scanner.Scan() {
 		line := scanner.Text()
 		trimmed := strings.TrimSpace(line)
@@ -740,7 +735,7 @@ func renderMarkdown(input string) string {
 				level = 6
 			}
 			text := strings.TrimSpace(trimmed[level:])
-			fmt.Fprintf(&out, "<h%d>%s</h%d>\n", level, formatInline(text, refs), level)
+			fmt.Fprintf(&out, "<h%d>%s</h%d>\n", level, formatInline(text), level)
 			continue
 		}
 
@@ -748,7 +743,7 @@ func renderMarkdown(input string) string {
 			flushParagraph()
 			closeList()
 			text := strings.TrimSpace(strings.TrimPrefix(trimmed, ">"))
-			out.WriteString("<blockquote><p>" + formatInline(text, refs) + "</p></blockquote>\n")
+			out.WriteString("<blockquote><p>" + formatInline(text) + "</p></blockquote>\n")
 			continue
 		}
 
@@ -759,12 +754,12 @@ func renderMarkdown(input string) string {
 				listTag = tag
 				out.WriteString("<" + listTag + ">\n")
 			}
-			out.WriteString("<li>" + formatInline(item, refs) + "</li>\n")
+			out.WriteString("<li>" + formatInline(item) + "</li>\n")
 			continue
 		}
 
 		closeList()
-		paragraph = append(paragraph, line)
+		paragraph = append(paragraph, trimmed)
 	}
 
 	flushParagraph()
@@ -790,144 +785,11 @@ func parseListItem(line string) (item, tag string, ok bool) {
 	return "", "", false
 }
 
-func normalizeRefLabel(s string) string {
-	s = strings.TrimSpace(s)
-	if s == "" {
-		return ""
-	}
-	s = strings.ToLower(s)
-	parts := strings.Fields(s)
-	return strings.Join(parts, " ")
-}
-
-func extractReferenceDefinitions(input string) (string, map[string]string) {
-	refs := map[string]string{}
-	scanner := bufio.NewScanner(strings.NewReader(input))
-	var kept []string
-	inCode := false
-
-	for scanner.Scan() {
-		line := scanner.Text()
-		trimmed := strings.TrimSpace(line)
-
-		if strings.HasPrefix(trimmed, "```") {
-			inCode = !inCode
-			kept = append(kept, line)
-			continue
-		}
-		if inCode {
-			kept = append(kept, line)
-			continue
-		}
-
-		m := reRefDef.FindStringSubmatch(line)
-		if m == nil {
-			kept = append(kept, line)
-			continue
-		}
-
-		label := normalizeRefLabel(m[1])
-		u := strings.TrimSpace(m[2])
-		u = strings.TrimPrefix(strings.TrimSuffix(u, ">"), "<")
-		if label != "" && u != "" {
-			refs[label] = u
-		}
-	}
-
-	return strings.Join(kept, "\n"), refs
-}
-
-func preserveSpacesOutsideTags(s string) string {
-	if !strings.Contains(s, "  ") {
-		return s
-	}
-
-	var b strings.Builder
-	b.Grow(len(s))
-
-	inTag := false
-	var prev byte
-
-	for i := 0; i < len(s); {
-		c := s[i]
-		if c == '<' {
-			inTag = true
-			b.WriteByte(c)
-			prev = c
-			i++
-			continue
-		}
-		if c == '>' {
-			inTag = false
-			b.WriteByte(c)
-			prev = c
-			i++
-			continue
-		}
-		if inTag {
-			b.WriteByte(c)
-			prev = c
-			i++
-			continue
-		}
-		if c != ' ' {
-			b.WriteByte(c)
-			prev = c
-			i++
-			continue
-		}
-
-		j := i
-		for j < len(s) && s[j] == ' ' {
-			j++
-		}
-		n := j - i
-		leading := b.Len() == 0 || prev == '>' || prev == '\n'
-
-		if n == 1 {
-			b.WriteByte(' ')
-			prev = ' '
-		} else if leading {
-			for k := 0; k < n; k++ {
-				b.WriteString("&nbsp;")
-			}
-			prev = ';'
-		} else {
-			for k := 0; k < n-1; k++ {
-				b.WriteString("&nbsp;")
-			}
-			b.WriteByte(' ')
-			prev = ' '
-		}
-		i = j
-	}
-	return b.String()
-}
-
-func formatInline(s string, refs map[string]string) string {
+func formatInline(s string) string {
 	out := template.HTMLEscapeString(s)
-	if len(refs) > 0 {
-		out = reRefLink.ReplaceAllStringFunc(out, func(m string) string {
-			sub := reRefLink.FindStringSubmatch(m)
-			if len(sub) != 3 {
-				return m
-			}
-			text := sub[1]
-			label := sub[2]
-			if strings.TrimSpace(label) == "" {
-				label = text
-			}
-			label = normalizeRefLabel(html.UnescapeString(label))
-			href := refs[label]
-			if href == "" {
-				return m
-			}
-			return `<a href="` + template.HTMLEscapeString(href) + `">` + text + `</a>`
-		})
-	}
 	out = reLink.ReplaceAllString(out, `<a href="$2">$1</a>`)
 	out = reBold.ReplaceAllString(out, `<strong>$1</strong>`)
 	out = reItalic.ReplaceAllString(out, `<em>$1</em>`)
 	out = reCode.ReplaceAllString(out, `<code>$1</code>`)
-	return preserveSpacesOutsideTags(out)
+	return out
 }
