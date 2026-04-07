@@ -205,7 +205,7 @@ func BuildStaticSite(opts BuildOptions) error {
 			AuthorGitHub: cfg.AuthorGitHub,
 			StylePath:    stylePath,
 			FaviconPath:  faviconPath,
-			SEO:          MakeSEO(cfg, post.Title+" - "+cfg.SiteTitle, Excerpt(post.Markdown, 140), WithBase(opts.BasePath, "/post/"+post.Slug+"/"), "article", post.Date.Format(time.RFC3339)),
+			SEO:          MakeSEO(cfg, post.Title+" - "+cfg.SiteTitle, Excerpt(post.Content, 140), WithBase(opts.BasePath, "/post/"+post.Slug+"/"), "article", post.Date.Format(time.RFC3339)),
 			Post:         post,
 			Comments:     BuildCommentConfig(cfg, post),
 		}); err != nil {

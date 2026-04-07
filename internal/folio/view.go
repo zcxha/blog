@@ -3,6 +3,8 @@ package folio
 import (
 	"fmt"
 	"html/template"
+	"net/url"
+	"strings"
 )
 
 type IndexPageData struct {
@@ -103,6 +105,9 @@ type CommentConfig struct {
 func ParseTemplate(theme, pageRel string, tagResolver func(string) string) (*template.Template, error) {
 	funcMap := template.FuncMap{
 		"tagURL": tagResolver,
+		"postURL": func(basePath, slug string) string {
+			return WithBase(basePath, "/post/"+url.PathEscape(strings.TrimSpace(slug)))
+		},
 	}
 	head := ResolveTemplatePath(theme, "partials/head-common.html")
 	nav := ResolveTemplatePath(theme, "partials/nav.html")

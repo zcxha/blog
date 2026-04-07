@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html"
 	"html/template"
 	"net/url"
 	"os"
@@ -24,6 +25,8 @@ type Post struct {
 	DateDisplay string
 	Tags        []string
 	Draft       bool
+	Format      string
+	Content     string
 	Markdown    string
 	HTML        template.HTML
 }
@@ -85,7 +88,16 @@ var (
 	reBold          = regexp.MustCompile(`\*\*(.+?)\*\*`)
 	reItalic        = regexp.MustCompile(`\*(.+?)\*`)
 	reCode          = regexp.MustCompile("`([^`]+)`")
+	reHTMLBody      = regexp.MustCompile(`(?is)<body\b[^>]*>(.*)</body>`)
+	reHTMLTitle     = regexp.MustCompile(`(?is)<title\b[^>]*>(.*?)</title>`)
+	reHTMLH1        = regexp.MustCompile(`(?is)<h1\b[^>]*>(.*?)</h1>`)
+	reHTMLScript    = regexp.MustCompile(`(?is)<script\b[^>]*>.*?</script>`)
+	reHTMLStyle     = regexp.MustCompile(`(?is)<style\b[^>]*>.*?</style>`)
+	reHTMLComment   = regexp.MustCompile(`(?is)<!--.*?-->`)
+	reHTMLTag       = regexp.MustCompile(`(?is)<[^>]+>`)
 )
+
+var supportedPostExtensions = []string{".md", ".html"}
 
 type markdownReference struct {
 	Label string
@@ -441,26 +453,38 @@ func PaginatePosts(posts []Post, page, perPage int) ([]Post, int, int) {
 func MakeSearchDocs(posts []Post) []SearchDoc {
 	docs := make([]SearchDoc, 0, len(posts))
 	for _, post := range posts {
+		content := post.Content
+		if strings.TrimSpace(content) == "" {
+			content = post.Markdown
+		}
 		docs = append(docs, SearchDoc{
 			Title:   post.Title,
 			Slug:    post.Slug,
 			Date:    post.DateDisplay,
 			Tags:    post.Tags,
-			Content: NormalizeSearchText(post.Markdown),
+			Content: NormalizeSearchText(content),
 		})
 	}
 	return docs
 }
 
 func LoadPosts(dir, fallbackAuthor string) ([]Post, error) {
-	files, err := filepath.Glob(filepath.Join(dir, "*.md"))
+	files, err := collectPostPaths(dir)
 	if err != nil {
 		return nil, err
 	}
 
 	posts := make([]Post, 0, len(files))
+	seenSlugs := make(map[string]string, len(files))
 	var loadErr error
 	for _, path := range files {
+		slug := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+		if previous, exists := seenSlugs[slug]; exists {
+			loadErr = errors.Join(loadErr, fmt.Errorf("duplicate post slug %q: %s and %s", slug, previous, path))
+			continue
+		}
+		seenSlugs[slug] = path
+
 		post, err := LoadPost(path, fallbackAuthor)
 		if err != nil {
 			loadErr = errors.Join(loadErr, fmt.Errorf("%s: %w", path, err))
@@ -482,8 +506,8 @@ func LoadPosts(dir, fallbackAuthor string) ([]Post, error) {
 }
 
 func LoadPostBySlug(dir, slug, fallbackAuthor string) (Post, error) {
-	path := filepath.Join(dir, slug+".md")
-	if _, err := os.Stat(path); err != nil {
+	path, err := resolvePostPathBySlug(dir, slug)
+	if err != nil {
 		return Post{}, err
 	}
 	return LoadPost(path, fallbackAuthor)
@@ -497,19 +521,34 @@ func LoadPost(path, fallbackAuthor string) (Post, error) {
 
 	slug := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
 	fm, body := splitFrontMatter(string(b))
+	body = strings.TrimSpace(body)
+	format := detectPostFormat(path)
+	title := strings.TrimSpace(fm["title"])
+	if title == "" && format == "html" {
+		title = detectHTMLTitle(body)
+	}
 
 	post := Post{
-		Slug:     slug,
-		Title:    fallbackTitle(fm["title"], slug),
-		Author:   fallbackAuthorName(fm["author"], fallbackAuthor),
-		Tags:     parseList(fm["tags"]),
-		Draft:    strings.EqualFold(strings.TrimSpace(fm["draft"]), "true"),
-		Markdown: strings.TrimSpace(body),
+		Slug:   slug,
+		Title:  fallbackTitle(title, slug),
+		Author: fallbackAuthorName(fm["author"], fallbackAuthor),
+		Tags:   parseList(fm["tags"]),
+		Draft:  strings.EqualFold(strings.TrimSpace(fm["draft"]), "true"),
+		Format: format,
 	}
 
 	post.Date = parseDateOrNow(fm["date"])
 	post.DateDisplay = post.Date.Format("2006-01-02")
-	post.HTML = template.HTML(renderMarkdown(post.Markdown))
+
+	switch format {
+	case "html":
+		post.Content = htmlToText(body)
+		post.HTML = template.HTML(extractHTMLContent(body))
+	default:
+		post.Markdown = body
+		post.Content = body
+		post.HTML = template.HTML(renderMarkdown(post.Markdown))
+	}
 	return post, nil
 }
 
@@ -530,6 +569,74 @@ func NormalizeSearchText(s string) string {
 	)
 	s = replacer.Replace(s)
 	return strings.Join(strings.Fields(s), " ")
+}
+
+func collectPostPaths(dir string) ([]string, error) {
+	files := make([]string, 0, len(supportedPostExtensions))
+	for _, ext := range supportedPostExtensions {
+		matches, err := filepath.Glob(filepath.Join(dir, "*"+ext))
+		if err != nil {
+			return nil, err
+		}
+		files = append(files, matches...)
+	}
+	sort.Strings(files)
+	return files, nil
+}
+
+func resolvePostPathBySlug(dir, slug string) (string, error) {
+	files, err := collectPostPaths(dir)
+	if err != nil {
+		return "", err
+	}
+	for _, path := range files {
+		if strings.TrimSuffix(filepath.Base(path), filepath.Ext(path)) == slug {
+			return path, nil
+		}
+	}
+	return "", os.ErrNotExist
+}
+
+func detectPostFormat(path string) string {
+	switch strings.ToLower(filepath.Ext(path)) {
+	case ".html":
+		return "html"
+	default:
+		return "markdown"
+	}
+}
+
+func extractHTMLContent(input string) string {
+	input = strings.TrimSpace(strings.ReplaceAll(input, "\r\n", "\n"))
+	if input == "" {
+		return ""
+	}
+	if match := reHTMLBody.FindStringSubmatch(input); len(match) == 2 {
+		return strings.TrimSpace(match[1])
+	}
+	return input
+}
+
+func detectHTMLTitle(input string) string {
+	for _, re := range []*regexp.Regexp{reHTMLTitle, reHTMLH1} {
+		if match := re.FindStringSubmatch(input); len(match) == 2 {
+			if title := htmlToText(match[1]); title != "" {
+				return title
+			}
+		}
+	}
+	return ""
+}
+
+func htmlToText(input string) string {
+	text := extractHTMLContent(input)
+	text = reHTMLComment.ReplaceAllString(text, " ")
+	text = reHTMLScript.ReplaceAllString(text, " ")
+	text = reHTMLStyle.ReplaceAllString(text, " ")
+	text = reHTMLTag.ReplaceAllString(text, " ")
+	text = html.UnescapeString(text)
+	text = strings.ReplaceAll(text, "\u00a0", " ")
+	return strings.Join(strings.Fields(text), " ")
 }
 
 func SlugifyTag(s string) string {

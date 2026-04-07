@@ -76,8 +76,8 @@ func TestURLTagPaginateAndSearch(t *testing.T) {
 	}
 
 	posts := []core.Post{
-		{Slug: "a", Tags: []string{"Go", "Tag"}, Date: time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC), Markdown: "# A", DateDisplay: "2026-03-01"},
-		{Slug: "b", Tags: []string{"go", "Tag", "Tag 2"}, Date: time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC), Markdown: "B", DateDisplay: "2026-02-01"},
+		{Slug: "a", Tags: []string{"Go", "Tag"}, Date: time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC), Markdown: "# A", Content: "# A", DateDisplay: "2026-03-01"},
+		{Slug: "b", Tags: []string{"go", "Tag", "Tag 2"}, Date: time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC), Markdown: "B", Content: "B", DateDisplay: "2026-02-01"},
 	}
 	stats := core.BuildTagStats(posts, "/repo", "dynamic")
 	if len(stats) < 2 {
@@ -132,6 +132,16 @@ date: "2026-03-01"
 ---
 draft body`)
 	mustWriteFile(t, filepath.Join(postsDir, "c.md"), "No front matter")
+	mustWriteFile(t, filepath.Join(postsDir, "html-post.html"), `---
+tags: ["HTML"]
+---
+<!doctype html>
+<html>
+<head><title>HTML Alpha</title></head>
+<body>
+  <article><h1>HTML Alpha</h1><p>Hello <strong>world</strong>.</p></article>
+</body>
+</html>`)
 	if err := os.Mkdir(filepath.Join(postsDir, "bad.md"), 0o755); err != nil {
 		t.Fatalf("create bad.md dir failed: %v", err)
 	}
@@ -142,6 +152,14 @@ draft body`)
 	}
 	if post.Title != "Alpha" || post.Author != "Alice" || len(post.Tags) != 2 || post.HTML == "" {
 		t.Fatalf("unexpected post: %+v", post)
+	}
+
+	htmlPost, err := core.LoadPost(filepath.Join(postsDir, "html-post.html"), "fallback")
+	if err != nil {
+		t.Fatalf("LoadPost html error: %v", err)
+	}
+	if htmlPost.Title != "HTML Alpha" || htmlPost.Format != "html" || htmlPost.Content == "" || !strings.Contains(string(htmlPost.HTML), "<article>") {
+		t.Fatalf("unexpected html post: %+v", htmlPost)
 	}
 
 	list, err := core.LoadPosts(postsDir, "fallback")
@@ -160,11 +178,14 @@ draft body`)
 	if err != nil {
 		t.Fatalf("LoadPosts error after removing bad post: %v", err)
 	}
-	if len(list) != 2 {
-		t.Fatalf("expected 2 visible posts, got %d", len(list))
+	if len(list) != 3 {
+		t.Fatalf("expected 3 visible posts, got %d", len(list))
 	}
 	if _, err := core.LoadPostBySlug(postsDir, "a", "x"); err != nil {
 		t.Fatalf("LoadPostBySlug error: %v", err)
+	}
+	if _, err := core.LoadPostBySlug(postsDir, "html-post", "x"); err != nil {
+		t.Fatalf("LoadPostBySlug html error: %v", err)
 	}
 
 	cfg := core.DefaultConfig()
@@ -254,7 +275,7 @@ draft: false
 
 func TestSearchIndexJSONShape(t *testing.T) {
 	docs := core.MakeSearchDocs([]core.Post{
-		{Title: "t", Slug: "s", DateDisplay: "2026-03-01", Tags: []string{"x"}, Markdown: "hello"},
+		{Title: "t", Slug: "s", DateDisplay: "2026-03-01", Tags: []string{"x"}, Markdown: "hello", Content: "hello"},
 	})
 	b, err := json.Marshal(docs)
 	if err != nil {

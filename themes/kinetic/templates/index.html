@@ -38,7 +38,7 @@
         <section class="post-grid">
           {{if .Posts}}
           {{range .Posts}}
-          <a class="post-card-link" href="{{$.BasePath}}/post/{{.Slug}}">
+          <a class="post-card-link" href="{{postURL $.BasePath .Slug}}">
             <article class="post-card">
               <p class="meta">{{.DateDisplay}}{{if .Author}} &middot; {{.Author}}{{end}}</p>
               <h3>{{.Title}}</h3>

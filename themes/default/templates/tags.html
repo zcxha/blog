@@ -25,7 +25,7 @@
     <section class="post-list">
       {{if .Posts}}
       {{range .Posts}}
-      <a class="post-card-link" href="{{$.BasePath}}/post/{{.Slug}}">
+      <a class="post-card-link" href="{{postURL $.BasePath .Slug}}">
         <article class="post-card">
           <h2>{{.Title}}</h2>
           <p class="meta">{{.DateDisplay}}</p>

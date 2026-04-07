@@ -160,7 +160,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	slug := strings.Trim(strings.TrimPrefix(r.URL.Path, "/post/"), "/")
-	if slug == "" || !core.IsValidSlug(slug) {
+	if slug == "" || strings.Contains(slug, "/") {
 		renderNotFound(w, r)
 		return
 	}
@@ -197,7 +197,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 		SEO: core.MakeSEO(
 			appConfig,
 			post.Title+" - "+appConfig.SiteTitle,
-			core.Excerpt(post.Markdown, 140),
+			core.Excerpt(post.Content, 140),
 			"/post/"+post.Slug,
 			"article",
 			post.Date.Format(time.RFC3339),

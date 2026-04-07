@@ -33,7 +33,7 @@
               {{range .Posts}}
               <li>
                 <span class="meta">{{.DateDisplay}}</span>
-                <a href="{{$.BasePath}}/post/{{.Slug}}">{{.Title}}</a>
+                <a href="{{postURL $.BasePath .Slug}}">{{.Title}}</a>
               </li>
               {{end}}
             </ul>

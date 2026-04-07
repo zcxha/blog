@@ -7,10 +7,13 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
+
+	core "folio/internal/folio"
 )
 
 func waitHTTP(url string, timeout time.Duration) error {
@@ -45,6 +48,14 @@ func freeTCPPort(t *testing.T) string {
 func TestServerMainRoutesSmoke(t *testing.T) {
 	root := repoRoot(t)
 	port := freeTCPPort(t)
+	posts, err := core.LoadPosts(filepath.Join(root, "posts"), "test")
+	if err != nil {
+		t.Fatalf("load posts failed: %v", err)
+	}
+	if len(posts) == 0 {
+		t.Fatal("expected at least one visible post")
+	}
+	samplePostPath := "/post/" + posts[0].Slug
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -75,7 +86,7 @@ func TestServerMainRoutesSmoke(t *testing.T) {
 		{"/archives", http.StatusOK},
 		{"/search", http.StatusOK},
 		{"/search-index.json", http.StatusOK},
-		{"/post/hello-folio", http.StatusOK},
+		{samplePostPath, http.StatusOK},
 		{"/post/hello_folio", http.StatusNotFound},
 		{"/post/not-found", http.StatusNotFound},
 		{"/tags?tag=%3Cscript%3E", http.StatusNotFound},

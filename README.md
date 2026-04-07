@@ -91,7 +91,12 @@ themes/
 
 ## 写作
 
-文章放在 `posts/*.md`，使用 Front Matter：
+文章支持两种格式，都会进入首页、标签页、归档页、搜索索引和静态构建：
+
+- `posts/*.md`：Markdown 模式
+- `posts/*.html`：HTML 模式
+
+两种格式都支持可选 Front Matter：
 
 ```markdown
 ---
@@ -105,6 +110,9 @@ draft: false
 
 - `author` 可选；不填时回退到 `config.json` 的 `author_name`。
 - `draft: true` 的文章不会出现在前台。
+- 若是 `.html` 文件且没写 `title`，程序会尝试从 HTML 的 `<title>` 或第一个 `<h1>` 自动提取标题。
+- `.html` 文件会直接按 HTML 渲染；`.md` 文件会继续按 Markdown 渲染。
+- 不要同时创建同名的 `posts/foo.md` 和 `posts/foo.html`，因为它们会映射到同一个文章链接 `/post/foo`。
 
 ## 页面与功能
 
@@ -135,6 +143,40 @@ go run ./cmd/build -out dist -base-path /your-repo-name
 
 - `-config`：指定配置文件路径（默认 `config.json`）
 - `-site-url`：导出时覆盖站点 URL
+
+## 一键发布
+
+仓库根目录新增了：
+
+- `publish.cmd`：Windows 下可直接双击
+- `scripts/publish.ps1`：PowerShell 发布脚本
+
+脚本会默认执行：
+
+1. `go test ./...`
+2. `go run ./cmd/build` 做一次本地构建检查
+3. `git add -A`
+4. 自动提交
+5. `git push origin HEAD:blog`
+
+也就是说，写完文章后直接双击 `publish.cmd`，或者在终端运行：
+
+```powershell
+.\publish.cmd
+```
+
+可选参数示例：
+
+```powershell
+.\publish.cmd -Message "post: 更新 scan 与并行思考"
+.\publish.cmd -SkipTests
+.\publish.cmd -SkipBuild
+```
+
+说明：
+
+- 默认推送到远端 `blog` 分支，因为 GitHub Pages 工作流当前监听的是 `blog`。
+- 如果当前本地分支不是 `blog`，脚本也会把当前 `HEAD` 推到远端 `blog`，所以使用前确认这正是你想发布的内容。
 
 ## 开发检查
 
