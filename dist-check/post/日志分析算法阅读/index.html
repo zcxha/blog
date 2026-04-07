@@ -1,0 +1,112 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+<head>
+  <title>日志分析</title>
+  <meta property="og:title" content="日志分析">
+  
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <meta name="description" content="日志分析 日志解析与处理 1 Drain: An Online Log Parsing Approach with Fixed Depth Tree 基于固定深度解析树，解析树只有叶子结点保存了日志组，第0层 第1层基于token长度转移，第1层 第k层基于token前缀转移，最...">
+  <link rel="canonical" href="https://zcxha.github.io/dev-blog/post/%e6%97%a5%e5%bf%97%e5%88%86%e6%9e%90%e7%ae%97%e6%b3%95%e9%98%85%e8%af%bb/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="zcxha">
+  <meta property="og:description" content="日志分析 日志解析与处理 1 Drain: An Online Log Parsing Approach with Fixed Depth Tree 基于固定深度解析树，解析树只有叶子结点保存了日志组，第0层 第1层基于token长度转移，第1层 第k层基于token前缀转移，最...">
+  <meta property="og:url" content="https://zcxha.github.io/dev-blog/post/日志分析算法阅读/">
+  
+  <link rel="icon" type="image/png" href="/dev-blog/static/favicon.2df160ae.png">
+  <link rel="stylesheet" href="/dev-blog/static/style.40c98510.css">
+
+  
+  <meta property="article:published_time" content="2026-04-07T21:23:39&#43;08:00">
+  
+  <script>
+    window.MathJax = {
+      tex: {
+        tags: 'ams',
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$', '$$'], ['\\[', '\\]']]
+      }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+</head>
+<body class="page-post">
+  <main class="container">
+    
+<nav class="back-nav" aria-label="页面导航">
+  <a href="/dev-blog/">返回首页</a>
+  <a href="/dev-blog/tags">标签</a>
+  <a href="/dev-blog/archives">归档</a>
+  <a href="/dev-blog/search">搜索</a>
+  <a href="https://github.com/zcxha" target="_blank" rel="noopener noreferrer">作者</a>
+</nav>
+
+    <article class="post-detail">
+      <header>
+        <h1>日志分析</h1>
+        <p class="meta">2026-04-07 &middot; zcxha</p>
+        
+        <p class="tags">
+          
+          <a class="tag-link" href="/dev-blog/tags/tag/">#博客</a>
+          
+          <a class="tag-link" href="/dev-blog/tags/log-parsing/">#Log Parsing</a>
+          
+          <a class="tag-link" href="/dev-blog/tags/drain/">#Drain</a>
+          
+        </p>
+        
+      </header>
+      <section class="content"><h1>日志分析</h1>
+<h5>日志解析与处理</h5>
+<p>[1]Drain: An Online Log Parsing Approach with Fixed Depth Tree</p>
+<p>基于固定深度解析树，解析树只有叶子结点保存了日志组，第0层-第1层基于token长度转移，第1层-第k层基于token前缀转移，最后转移到叶子结点，对每个已有日志组进行匹配，基于以下匹配函数 $$ simSeq = \frac{\sum_{i=1}^{n}equ(seq_1(i),seq_2(i))}{n} $$ 其中seq1代表日志事件、seq2代表日志消息。seq(i)代表日志序列的第i个token，equ函数定义如下 $$ equ(t_1,t_2) = \begin{cases} 1  \ \ \ \  if \ t1 = t2\\ 0  \ \ \ \ otherwise \end{cases} $$ 当simSeq高于某个预设的阈值时则返回匹配的日志组并在后续更新解析树，否则新建一个日志组叶子结点。</p>
+<p>[2]Spell: Streaming Parsing of System Event Logs</p>
+<p>存一个LCSObject，包含LCSseq，用于日志转化为tokens的LCS比较，lineIds表示这个Object对应的日志行集合。当一个新的日志条目e到来时其转化为tokens形式的s，与所有的LCSObject的LCSseq计算LCS的长度，若大于等于|s|/2则认为属于这个条目，并选择最小seq长度作为组。匹配的时间复杂度优化方法包含直接比较所有字符串以及前缀树。</p>
+<h5>日志异常检测</h5>
+<p>[1]DeepLog</p>
+<p>除日志键外，DeepLog还为每条日志$e$构建<strong>参数值向量</strong>$\vec{v}_e$，该向量包含当前日志与前一条日志的<strong>时间间隔</strong>和日志中提取的关键参数值（如文件ID、执行耗时等）。</p>
+<ol>
+<li><p>日志执行序列异常检测</p>
+<p>选取$w = {m_{t-h},...,m_{t-2},m_{t-1}}$的h长日志键窗口作为输入，$Pr(m_t = k_i|w)$的概率分布作为输出，若$m_t$出现在前$g$的概率分布中则认为没有发生异常，否则触发了异常。可以使用N-gram模型或LSTM模型进行具体实现。</p></li>
+<li><p>参数值或性能异常检测</p>
+<p>将参数值向量看成时间序列，为每个日志键的参数值向量集合，对每个日志键集合使用LSTM模型进行训练。在异常检测时通过预测值与观测值的均方误差判定日志条目是否异常。</p></li>
+<li><p>工作流模型构建</p>
+<p>通过构建有限状态自动机，构建任务执行路径。在多任务同时执行的日志中，</p>
+<p>（1）基于调整滑动窗口大小和区分同任务内并发、新任务启动、条件分支进行分离。</p>
+<p>（2）依据 “同任务日志键共现率高、跨任务共现率低” 的特性，通过共现矩阵实现分离：</p>
+<p>1. 定义日志键距离 d（两键间日志数量 + 1），以及多 d 维度的共现矩阵 pd (i,j)（衡量日志键 ki 和 kj 在 d 范围内的共现概率）。</p>
+<p>2. 分步聚类</p>
+<ul>
+<li><p>从 d=1 开始，以阈值 τ（如 0.9）连接高共现日志键，形成初始任务；</p></li>
+<li><p>递归扩展任务：检查新日志键与任务内所有键的多距离共现概率是否超 τ，符合则纳入任务；</p></li>
+<li><p>识别并发键：若两键共现概率随 d 增大而提升，判定为同任务多线程产生，否则为新任务；</p></li>
+<li><p>去重优化：剔除被其他任务序列包含的子序列，保证任务独立性。</p>
+<p>通过工作流模型可以实现异常定位。</p></li>
+</ul></li>
+</ol>
+</section>
+    </article>
+
+    
+    <section class="comments">
+      
+      
+      <script src="https://utteranc.es/client.js"
+        repo="zcxha/dev-blog"
+        issue-term="pathname"
+        label="comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+      </script>
+      
+    </section>
+    
+  </main>
+</body>
+</html>
+

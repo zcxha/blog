@@ -425,6 +425,24 @@ body.page-search .back-nav a:nth-child(4) {
   margin: 10px 0 12px 24px;
 }
 
+.content img,
+.content video,
+.content svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.content p > img:only-child,
+.content p > .md-image:only-child img,
+.content figure > img:first-child:last-child {
+  display: block;
+  margin: 16px auto;
+}
+
+.content figure {
+  margin: 18px 0;
+}
+
 .content li > p {
   margin: 8px 0;
 }

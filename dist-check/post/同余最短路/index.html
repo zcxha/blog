@@ -1,0 +1,185 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+<head>
+  <title>同余最短路</title>
+  <meta property="og:title" content="同余最短路">
+  
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <meta name="description" content="P3403 3 假设 $x&lt;y&lt;z$ ,把 $H $ ，让值域变成 $ 0,H $ 1.设集合S, $$ S=\{l | l = by&#43;cz\} $$ 也就是只用 $y$ 跟 $z$ 能到的楼层 则对每个 $l$ ,加上若干的 $x$ 也是答案。 但是 $S$ 中会有多个数与 $...">
+  <link rel="canonical" href="https://zcxha.github.io/dev-blog/post/%e5%90%8c%e4%bd%99%e6%9c%80%e7%9f%ad%e8%b7%af/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="zcxha">
+  <meta property="og:description" content="P3403 3 假设 $x&lt;y&lt;z$ ,把 $H $ ，让值域变成 $ 0,H $ 1.设集合S, $$ S=\{l | l = by&#43;cz\} $$ 也就是只用 $y$ 跟 $z$ 能到的楼层 则对每个 $l$ ,加上若干的 $x$ 也是答案。 但是 $S$ 中会有多个数与 $...">
+  <meta property="og:url" content="https://zcxha.github.io/dev-blog/post/同余最短路/">
+  
+  <link rel="icon" type="image/png" href="/dev-blog/static/favicon.2df160ae.png">
+  <link rel="stylesheet" href="/dev-blog/static/style.40c98510.css">
+
+  
+  <meta property="article:published_time" content="2026-04-07T21:23:39&#43;08:00">
+  
+  <script>
+    window.MathJax = {
+      tex: {
+        tags: 'ams',
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$', '$$'], ['\\[', '\\]']]
+      }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+</head>
+<body class="page-post">
+  <main class="container">
+    
+<nav class="back-nav" aria-label="页面导航">
+  <a href="/dev-blog/">返回首页</a>
+  <a href="/dev-blog/tags">标签</a>
+  <a href="/dev-blog/archives">归档</a>
+  <a href="/dev-blog/search">搜索</a>
+  <a href="https://github.com/zcxha" target="_blank" rel="noopener noreferrer">作者</a>
+</nav>
+
+    <article class="post-detail">
+      <header>
+        <h1>同余最短路</h1>
+        <p class="meta">2026-04-07 &middot; zcxha</p>
+        
+        <p class="tags">
+          
+          <a class="tag-link" href="/dev-blog/tags/cp/">#CP</a>
+          
+          <a class="tag-link" href="/dev-blog/tags/tag-2/">#数论</a>
+          
+          <a class="tag-link" href="/dev-blog/tags/tag-3/">#最短路</a>
+          
+        </p>
+        
+      </header>
+      <section class="content"><p><a href="https://www.luogu.com.cn/problem/P3403">P3403</a> 假设 $x&lt;y&lt;z$ ,把 $H--$ ，让值域变成 $[0,H]$</p>
+<p>1.设集合S, $$ S=\{l | l = by+cz\} $$ 也就是只用 $y$ 跟 $z$ 能到的楼层 则对每个 $l$ ,加上若干的 $x$ 也是答案。 但是 $S$ 中会有多个数与 $x$ 同余，导致重复统计答案。 <a href="https://www.luogu.com.cn/article/q03ckm2b">参考1</a></p>
+<p>2.思考选出 $S$ 中剩余类代表元进行答案的统计。 设 $S$ 中模 $x$ 为 $k$ 的剩余类中的最小值作为代表元 $f(k)$ 也就是说 $S$ 被 $mod x$ 的余数划分为多个集合，$f(k)$ 作为余数为 $k$ 的集合的最小值,该最小值作为代表元。</p>
+<p>对这个群（显然）的代表元，有如下转移 $$ f(k) + y \ge f((k + y) \% x) $$ 先讨论y。则z同理 我们看一下+y的转移 如何证明 $f((k+y)\%x)$ 小于等于 $f(k) + y$ ？有 $$ f(k) \ge k $$</p>
+<p>则 $$ f(k) + y \ge k + y $$</p>
+<p>$$ f((k+y) \% x) \le f(k + y) \le k + y \le f(k) + y $$</p>
+<p>不等式链成立.</p>
+<p>那就可以用最短路进行求解了。</p>
+<p>何意味呢？ 我又不知道 $f$ 咋求</p>
+<p>其实现在是差分约束 也就是说，$0...x-1$ 这 $x$ 个结点 他们的 $f$ 就是他们的 $dis$</p>
+<p>求出 $f$ 之后，对每个 $f$ 的元素统计答案</p>
+<p>每个元素的答案是 $(H-f) / x + 1$</p>
+<p><a href="https://www.luogu.com.cn/article/r61gmb8e">参考2</a></p>
+<pre><code>#include &lt;bits/stdc++.h&gt;
+
+using namespace std;
+
+typedef unsigned long long ull;
+
+const ull maxn = 1e5 + 5;
+
+const ull inf = ULLONG_MAX;
+
+struct node {
+	ull v, w;
+};
+
+vector&lt;node&gt; e[maxn];
+
+void addedge(ull u, ull v, ull w)
+{
+	e[u].push_back({v, w});
+}
+
+vector&lt;ull&gt; dijkstra(ull n, ull s)
+{
+	vector&lt;ull&gt; dis(n, inf);
+	vector&lt;bool&gt; vis(n, false);
+	struct pqnode {
+		ull u, dis;
+		bool operator &lt; (const pqnode &amp;b) const {
+			return dis &gt; b.dis;
+		}
+	};
+	priority_queue&lt;pqnode&gt; pq;
+
+	dis[s] = 0;
+	pq.push({s, dis[s]});
+
+	while(!pq.empty()) {
+		ull u = pq.top().u;
+		pq.pop();
+		if(vis[u]) continue;
+		vis[u] = 1;
+		for(auto edge : e[u])
+		{
+			ull v = edge.v, w = edge.w;
+			if(dis[v] &gt; dis[u] + w)
+			{
+				dis[v] = dis[u] + w;
+				pq.push({v, dis[v]});
+			}
+		}
+	}
+
+	return dis;
+}
+
+int main()
+{
+	ull h, x, y, z;
+
+	cin &gt;&gt; h &gt;&gt; x &gt;&gt; y &gt;&gt; z;
+
+	h--;
+
+	for(ull k = 0; k &lt; x; k++)
+	{
+		addedge(k, (k + y) % x, y);
+		addedge(k, (k + z) % x, z);
+	}
+
+	vector&lt;ull&gt; dis = dijkstra(x, 0);
+
+	ull ans = 0;
+	for(ull i = 0; i &lt; x; i++)
+	{
+		// 注意S集合不一定有x的所有余数的代表元。
+		if(dis[i] &lt;= h)ans += (h - dis[i]) / x + 1;
+	}
+	cout &lt;&lt; ans;
+}
+</code></pre>
+<section class="references">
+<h2>参考文献</h2>
+<ul>
+<li><span class="reference-label">[1]</span> <a href="https://www.luogu.com.cn/article/q03ckm2b">https://www.luogu.com.cn/article/q03ckm2b</a></li>
+<li><span class="reference-label">[2]</span> <a href="https://www.luogu.com.cn/article/r61gmb8e">https://www.luogu.com.cn/article/r61gmb8e</a></li>
+<li><span class="reference-label">[3]</span> <a href="https://www.luogu.com.cn/problem/P3403">https://www.luogu.com.cn/problem/P3403</a></li>
+</ul>
+</section>
+</section>
+    </article>
+
+    
+    <section class="comments">
+      
+      
+      <script src="https://utteranc.es/client.js"
+        repo="zcxha/dev-blog"
+        issue-term="pathname"
+        label="comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+      </script>
+      
+    </section>
+    
+  </main>
+</body>
+</html>
+
