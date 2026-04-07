@@ -71,6 +71,9 @@ func TestBuildStaticSiteDirect(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(outDir, "index.html")); err != nil {
 		t.Fatalf("expected output index.html missing: %v", err)
 	}
+	if _, err := os.Stat(filepath.Join(outDir, "images")); err != nil {
+		t.Fatalf("expected copied images directory missing: %v", err)
+	}
 }
 
 func TestBuildCommandFailsOnInvalidConfig(t *testing.T) {

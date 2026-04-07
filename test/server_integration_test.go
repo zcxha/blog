@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -45,6 +46,38 @@ func freeTCPPort(t *testing.T) string {
 	return strconv.Itoa(addr.Port)
 }
 
+func firstImageRequestPath(t *testing.T, root string) string {
+	t.Helper()
+	imagesRoot := filepath.Join(root, "posts", "images")
+	var rel string
+	err := filepath.WalkDir(imagesRoot, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		found, relErr := filepath.Rel(imagesRoot, path)
+		if relErr != nil {
+			return relErr
+		}
+		rel = filepath.ToSlash(found)
+		return io.EOF
+	})
+	if err != nil && err != io.EOF {
+		t.Fatalf("walk images failed: %v", err)
+	}
+	if rel == "" {
+		t.Fatal("expected at least one post image")
+	}
+
+	segments := strings.Split(rel, "/")
+	for i, segment := range segments {
+		segments[i] = url.PathEscape(segment)
+	}
+	return "/images/" + strings.Join(segments, "/")
+}
+
 func TestServerMainRoutesSmoke(t *testing.T) {
 	root := repoRoot(t)
 	port := freeTCPPort(t)
@@ -56,6 +89,7 @@ func TestServerMainRoutesSmoke(t *testing.T) {
 		t.Fatal("expected at least one visible post")
 	}
 	samplePostPath := "/post/" + posts[0].Slug
+	sampleImagePath := firstImageRequestPath(t, root)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -93,6 +127,7 @@ func TestServerMainRoutesSmoke(t *testing.T) {
 		{"/static/not-found.css", http.StatusNotFound},
 		{"/static/../config.json", http.StatusNotFound},
 		{"/static/style.css", http.StatusOK},
+		{sampleImagePath, http.StatusOK},
 		{"/not-found-page", http.StatusNotFound},
 	}
 	for _, tc := range cases {

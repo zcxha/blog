@@ -65,6 +65,9 @@ func BuildStaticSite(opts BuildOptions) error {
 	if err := copyDirIfExists(filepath.Join("themes", NormalizeThemeName(cfg.Theme), "static"), filepath.Join(opts.OutDir, "static")); err != nil {
 		return err
 	}
+	if err := copyDirIfExists(filepath.Join(opts.PostsDir, "images"), filepath.Join(opts.OutDir, "images")); err != nil {
+		return err
+	}
 
 	assets, err := fingerprintAssets(filepath.Join(opts.OutDir, "static"), []string{"style.css", "favicon.png"})
 	if err != nil {
@@ -199,6 +202,7 @@ func BuildStaticSite(opts BuildOptions) error {
 	}
 
 	for _, post := range posts {
+		renderPost := PreparePostForRender(post, opts.BasePath)
 		if err := renderStaticFile(filepath.Join(opts.OutDir, "post", post.Slug, "index.html"), "post.html", opts.BasePath, tagURLs, cfg.Theme, PostPageData{
 			Title:        post.Title,
 			BasePath:     base,
@@ -206,7 +210,7 @@ func BuildStaticSite(opts BuildOptions) error {
 			StylePath:    stylePath,
 			FaviconPath:  faviconPath,
 			SEO:          MakeSEO(cfg, post.Title+" - "+cfg.SiteTitle, Excerpt(post.Content, 140), WithBase(opts.BasePath, "/post/"+post.Slug+"/"), "article", post.Date.Format(time.RFC3339)),
-			Post:         post,
+			Post:         renderPost,
 			Comments:     BuildCommentConfig(cfg, post),
 		}); err != nil {
 			return err

@@ -286,6 +286,19 @@ func TestSearchIndexJSONShape(t *testing.T) {
 	}
 }
 
+func TestPreparePostForRenderRewritesLocalHTMLImages(t *testing.T) {
+	post := core.Post{
+		Format: "html",
+		HTML:   `<p><img src="./images/scan与并行思考/demo image.png" alt="demo"></p>`,
+	}
+
+	rendered := core.PreparePostForRender(post, "/dev-blog")
+	html := string(rendered.HTML)
+	if !strings.Contains(html, `/dev-blog/images/scan%E4%B8%8E%E5%B9%B6%E8%A1%8C%E6%80%9D%E8%80%83/demo%20image.png`) {
+		t.Fatalf("expected rewritten image url, got: %s", html)
+	}
+}
+
 func TestRoutingHelpers(t *testing.T) {
 	if !core.IsValidSlug("hello-1") || core.IsValidSlug("hello_1") {
 		t.Fatalf("IsValidSlug mismatch")

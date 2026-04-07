@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -57,6 +58,7 @@ func main() {
 func newMux() *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/static/", staticHandler)
+	mux.HandleFunc("/images/", postImageHandler)
 	mux.HandleFunc("/", indexHandler)
 	mux.HandleFunc("/post/", postHandler)
 	mux.HandleFunc("/tags", tagsHandler)
@@ -179,6 +181,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 		renderNotFound(w, r)
 		return
 	}
+	post = core.PreparePostForRender(post, "")
 
 	tpl, err := parseTemplate("", "dynamic", "post.html")
 	if err != nil {
@@ -371,6 +374,31 @@ func staticHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.ServeFile(w, r, p)
+}
+
+func postImageHandler(w http.ResponseWriter, r *http.Request) {
+	if !strings.HasPrefix(r.URL.Path, "/images/") {
+		renderNotFound(w, r)
+		return
+	}
+
+	rel := strings.TrimPrefix(path.Clean("/"+strings.TrimPrefix(r.URL.Path, "/images/")), "/")
+	if rel == "" || rel == "." {
+		renderNotFound(w, r)
+		return
+	}
+
+	assetsRoot := filepath.Clean(filepath.Join(postDir, "images"))
+	target := filepath.Clean(filepath.Join(assetsRoot, filepath.FromSlash(rel)))
+	if target != assetsRoot && !strings.HasPrefix(target, assetsRoot+string(os.PathSeparator)) {
+		renderNotFound(w, r)
+		return
+	}
+	if info, err := os.Stat(target); err != nil || info.IsDir() {
+		renderNotFound(w, r)
+		return
+	}
+	http.ServeFile(w, r, target)
 }
 
 func currentAssetPaths(basePath string) (string, string) {

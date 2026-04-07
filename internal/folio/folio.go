@@ -10,6 +10,7 @@ import (
 	"html/template"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -95,6 +96,7 @@ var (
 	reHTMLStyle     = regexp.MustCompile(`(?is)<style\b[^>]*>.*?</style>`)
 	reHTMLComment   = regexp.MustCompile(`(?is)<!--.*?-->`)
 	reHTMLTag       = regexp.MustCompile(`(?is)<[^>]+>`)
+	reHTMLAssetAttr = regexp.MustCompile(`(?i)\b(src|href|poster)=(['"])(?:\./)?images/([^'"]+)(['"])`)
 )
 
 var supportedPostExtensions = []string{".md", ".html"}
@@ -637,6 +639,51 @@ func htmlToText(input string) string {
 	text = html.UnescapeString(text)
 	text = strings.ReplaceAll(text, "\u00a0", " ")
 	return strings.Join(strings.Fields(text), " ")
+}
+
+func PreparePostForRender(post Post, basePath string) Post {
+	if post.Format != "html" || post.HTML == "" {
+		return post
+	}
+	post.HTML = template.HTML(rewriteHTMLAssetURLs(string(post.HTML), basePath))
+	return post
+}
+
+func rewriteHTMLAssetURLs(input, basePath string) string {
+	return reHTMLAssetAttr.ReplaceAllStringFunc(input, func(match string) string {
+		parts := reHTMLAssetAttr.FindStringSubmatch(match)
+		if len(parts) != 5 || parts[2] != parts[4] {
+			return match
+		}
+
+		assetPath, ok := buildPostAssetURL(basePath, parts[3])
+		if !ok {
+			return match
+		}
+		return fmt.Sprintf(`%s=%s%s%s`, parts[1], parts[2], assetPath, parts[2])
+	})
+}
+
+func buildPostAssetURL(basePath, rel string) (string, bool) {
+	cleaned := path.Clean("/images/" + strings.TrimSpace(rel))
+	if !strings.HasPrefix(cleaned, "/images/") {
+		return "", false
+	}
+	return WithBase(basePath, encodeURLPath(cleaned)), true
+}
+
+func encodeURLPath(raw string) string {
+	if raw == "" {
+		return ""
+	}
+	parts := strings.Split(raw, "/")
+	for i, part := range parts {
+		if i == 0 && part == "" {
+			continue
+		}
+		parts[i] = url.PathEscape(part)
+	}
+	return strings.Join(parts, "/")
 }
 
 func SlugifyTag(s string) string {

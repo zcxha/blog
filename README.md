@@ -112,6 +112,7 @@ draft: false
 - `draft: true` 的文章不会出现在前台。
 - 若是 `.html` 文件且没写 `title`，程序会尝试从 HTML 的 `<title>` 或第一个 `<h1>` 自动提取标题。
 - `.html` 文件会直接按 HTML 渲染；`.md` 文件会继续按 Markdown 渲染。
+- HTML 文章里若使用 `./images/...`，程序会自动映射到站点的文章图片目录；静态构建时 `posts/images` 也会一起发布。
 - 不要同时创建同名的 `posts/foo.md` 和 `posts/foo.html`，因为它们会映射到同一个文章链接 `/post/foo`。
 
 ## 页面与功能
