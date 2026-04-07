@@ -29,6 +29,7 @@ type Post struct {
 	Format      string
 	Content     string
 	Markdown    string
+	RawHTML     string
 	HTML        template.HTML
 }
 
@@ -544,6 +545,7 @@ func LoadPost(path, fallbackAuthor string) (Post, error) {
 
 	switch format {
 	case "html":
+		post.RawHTML = body
 		post.Content = htmlToText(body)
 		post.HTML = template.HTML(extractHTMLContent(body))
 	default:
@@ -647,6 +649,13 @@ func PreparePostForRender(post Post, basePath string) Post {
 	}
 	post.HTML = template.HTML(rewriteHTMLAssetURLs(string(post.HTML), basePath))
 	return post
+}
+
+func PreparePostDocumentForRender(post Post, basePath string) string {
+	if post.Format != "html" {
+		return ""
+	}
+	return rewriteHTMLAssetURLs(post.RawHTML, basePath)
 }
 
 func rewriteHTMLAssetURLs(input, basePath string) string {

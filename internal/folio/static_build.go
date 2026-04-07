@@ -202,8 +202,16 @@ func BuildStaticSite(opts BuildOptions) error {
 	}
 
 	for _, post := range posts {
+		outPath := filepath.Join(opts.OutDir, "post", post.Slug, "index.html")
+		if post.Format == "html" {
+			if err := writeBuildString(outPath, PreparePostDocumentForRender(post, opts.BasePath)); err != nil {
+				return err
+			}
+			continue
+		}
+
 		renderPost := PreparePostForRender(post, opts.BasePath)
-		if err := renderStaticFile(filepath.Join(opts.OutDir, "post", post.Slug, "index.html"), "post.html", opts.BasePath, tagURLs, cfg.Theme, PostPageData{
+		if err := renderStaticFile(outPath, "post.html", opts.BasePath, tagURLs, cfg.Theme, PostPageData{
 			Title:        post.Title,
 			BasePath:     base,
 			AuthorGitHub: cfg.AuthorGitHub,
@@ -247,6 +255,13 @@ func writeBuildJSON(path string, v any) (err error) {
 	enc := json.NewEncoder(f)
 	enc.SetIndent("", "  ")
 	return enc.Encode(v)
+}
+
+func writeBuildString(path, content string) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(path, []byte(content), 0o644)
 }
 
 func renderStaticFile(dstPath, page, basePath string, tagURLs map[string]string, theme string, data any) (err error) {

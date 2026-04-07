@@ -91,6 +91,17 @@ func renderHTMLWithStatus(w http.ResponseWriter, tpl *template.Template, data an
 	}
 }
 
+func renderRawHTML(w http.ResponseWriter, html string, status int) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+	w.Header().Set("Pragma", "no-cache")
+	w.Header().Set("Expires", "0")
+	w.WriteHeader(status)
+	if _, err := w.Write([]byte(html)); err != nil {
+		log.Printf("write raw html error: %v", err)
+	}
+}
+
 func renderNotFound(w http.ResponseWriter, r *http.Request) {
 	tpl, err := parseTemplate("", "dynamic", "404.html")
 	if err != nil {
@@ -181,7 +192,10 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 		renderNotFound(w, r)
 		return
 	}
-	post = core.PreparePostForRender(post, "")
+	if post.Format == "html" {
+		renderRawHTML(w, core.PreparePostDocumentForRender(post, ""), http.StatusOK)
+		return
+	}
 
 	tpl, err := parseTemplate("", "dynamic", "post.html")
 	if err != nil {
