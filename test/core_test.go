@@ -132,7 +132,8 @@ date: "2026-03-01"
 ---
 draft body`)
 	mustWriteFile(t, filepath.Join(postsDir, "c.md"), "No front matter")
-	mustWriteFile(t, filepath.Join(postsDir, "html-post.html"), `---
+	htmlPostPath := filepath.Join(postsDir, "html-post.html")
+	mustWriteFile(t, htmlPostPath, `---
 tags: ["HTML"]
 ---
 <!doctype html>
@@ -142,6 +143,10 @@ tags: ["HTML"]
   <article><h1>HTML Alpha</h1><p>Hello <strong>world</strong>.</p></article>
 </body>
 </html>`)
+	htmlPostTime := time.Date(2026, 4, 19, 14, 38, 14, 0, time.Local)
+	if err := os.Chtimes(htmlPostPath, htmlPostTime, htmlPostTime); err != nil {
+		t.Fatalf("set html post time failed: %v", err)
+	}
 	if err := os.Mkdir(filepath.Join(postsDir, "bad.md"), 0o755); err != nil {
 		t.Fatalf("create bad.md dir failed: %v", err)
 	}
@@ -154,11 +159,11 @@ tags: ["HTML"]
 		t.Fatalf("unexpected post: %+v", post)
 	}
 
-	htmlPost, err := core.LoadPost(filepath.Join(postsDir, "html-post.html"), "fallback")
+	htmlPost, err := core.LoadPost(htmlPostPath, "fallback")
 	if err != nil {
 		t.Fatalf("LoadPost html error: %v", err)
 	}
-	if htmlPost.Title != "HTML Alpha" || htmlPost.Format != "html" || htmlPost.Content == "" || !strings.Contains(string(htmlPost.HTML), "<article>") {
+	if htmlPost.Title != "HTML Alpha" || htmlPost.Format != "html" || htmlPost.Content == "" || !strings.Contains(string(htmlPost.HTML), "<article>") || htmlPost.DateDisplay != "2026-04-19" {
 		t.Fatalf("unexpected html post: %+v", htmlPost)
 	}
 

@@ -521,6 +521,10 @@ func LoadPost(path, fallbackAuthor string) (Post, error) {
 	if err != nil {
 		return Post{}, err
 	}
+	info, err := os.Stat(path)
+	if err != nil {
+		return Post{}, err
+	}
 
 	slug := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
 	fm, body := splitFrontMatter(string(b))
@@ -540,7 +544,7 @@ func LoadPost(path, fallbackAuthor string) (Post, error) {
 		Format: format,
 	}
 
-	post.Date = parseDateOrNow(fm["date"])
+	post.Date = parseDateOrFallback(fm["date"], info.ModTime())
 	post.DateDisplay = post.Date.Format("2006-01-02")
 
 	switch format {
@@ -814,10 +818,10 @@ func parseList(raw string) []string {
 	return out
 }
 
-func parseDateOrNow(raw string) time.Time {
+func parseDateOrFallback(raw string, fallback time.Time) time.Time {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
-		return time.Now()
+		return fallback
 	}
 
 	layouts := []string{time.RFC3339, "2006-01-02", "2006-01-02 15:04:05"}
@@ -826,7 +830,7 @@ func parseDateOrNow(raw string) time.Time {
 			return t
 		}
 	}
-	return time.Now()
+	return fallback
 }
 
 func fallbackTitle(title, slug string) string {

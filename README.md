@@ -109,6 +109,7 @@ draft: false
 ```
 
 - `author` 可选；不填时回退到 `config.json` 的 `author_name`。
+- `date` 可选；不填或解析失败时回退到文章文件的修改时间。
 - `draft: true` 的文章不会出现在前台。
 - 若是 `.html` 文件且没写 `title`，程序会尝试从 HTML 的 `<title>` 或第一个 `<h1>` 自动提取标题。
 - `.html` 文件会按原始 HTML 文档直接输出，不再套博客正文排版；`.md` 文件会继续按 Markdown 渲染。
