@@ -46,7 +46,7 @@
           {{range .Posts}}
           <a class="post-card-link" href="{{postURL $.BasePath .Slug}}">
             <article class="post-card">
-              <p class="meta">{{.DateDisplay}}</p>
+              <p class="meta">{{.DateDisplay}}{{if .Category}} &middot; {{.Category}}{{end}}</p>
               <h3>{{.Title}}</h3>
             </article>
           </a>

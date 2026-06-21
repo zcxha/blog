@@ -4,6 +4,8 @@
   <a href="{{.BasePath}}/tags">标签</a>
   <a href="{{.BasePath}}/archives">归档</a>
   <a href="{{.BasePath}}/search">搜索</a>
+  {{if .Analytics.Enabled}}<span class="nav-stat">全站浏览 <strong data-site-view-count></strong></span>{{end}}
+  {{if .Analytics.PublicURL}}<a href="{{.Analytics.PublicURL}}" target="_blank" rel="noopener noreferrer">统计</a>{{end}}
   {{if .AuthorGitHub}}<a href="{{.AuthorGitHub}}" target="_blank" rel="noopener noreferrer">作者</a>{{end}}
 </nav>
 {{end}}
@@ -14,6 +16,8 @@
   <a href="{{.BasePath}}/tags">标签</a>
   <a href="{{.BasePath}}/archives">归档</a>
   <a href="{{.BasePath}}/search">搜索</a>
+  {{if .Analytics.Enabled}}<span class="nav-stat">全站浏览 <strong data-site-view-count></strong></span>{{end}}
+  {{if .Analytics.PublicURL}}<a href="{{.Analytics.PublicURL}}" target="_blank" rel="noopener noreferrer">统计</a>{{end}}
   {{if .AuthorGitHub}}<a href="{{.AuthorGitHub}}" target="_blank" rel="noopener noreferrer">作者</a>{{end}}
 </nav>
 {{end}}

@@ -575,6 +575,43 @@ mark {
   border-top: 4px dashed #000;
 }
 
+.nav-stat {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.category-link {
+  color: inherit;
+  text-underline-offset: 3px;
+}
+
+.post-engagement {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 4px dashed #000;
+}
+
+.like-button {
+  border: 3px solid #000;
+  border-radius: 999px;
+  background: var(--yellow);
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  padding: 8px 14px;
+  box-shadow: 3px 3px 0 #000;
+}
+
+.like-button.is-liked {
+  background: var(--pink);
+}
+
 .empty {
   border-style: dashed;
   padding: 16px;

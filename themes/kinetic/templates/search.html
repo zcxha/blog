@@ -187,7 +187,7 @@
           return;
         }
         matched = docs.filter((doc) => {
-          const hay = `${doc.title || ""} ${(doc.tags || []).join(" ")} ${doc.content || ""}`.toLowerCase();
+          const hay = `${doc.title || ""} ${doc.category || ""} ${(doc.tags || []).join(" ")} ${doc.content || ""}`.toLowerCase();
           return hay.includes(keyword);
         });
         currentPage = 1;
@@ -203,7 +203,7 @@
           currentPage = Math.floor(initialPage);
         }
         matched = docs.filter((doc) => {
-          const hay = `${doc.title || ""} ${(doc.tags || []).join(" ")} ${doc.content || ""}`.toLowerCase();
+          const hay = `${doc.title || ""} ${doc.category || ""} ${(doc.tags || []).join(" ")} ${doc.content || ""}`.toLowerCase();
           return hay.includes(initial.toLowerCase());
         });
         render(initial.toLowerCase());

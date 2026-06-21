@@ -61,6 +61,20 @@ func TestConfigAndSEO(t *testing.T) {
 	}
 }
 
+func TestAnalyticsConfigValidation(t *testing.T) {
+	cfg := core.DefaultConfig()
+	cfg.AnalyticsProvider = "goatcounter"
+	cfg.AnalyticsEndpoint = "http://example.com/count"
+	if got := core.BuildAnalyticsConfig(cfg); got.Enabled {
+		t.Fatalf("insecure analytics endpoint must be disabled: %+v", got)
+	}
+	cfg.AnalyticsEndpoint = "https://example.goatcounter.com/count"
+	cfg.AnalyticsPublicURL = "https://example.goatcounter.com"
+	if got := core.BuildAnalyticsConfig(cfg); !got.Enabled || got.PublicURL == "" {
+		t.Fatalf("valid analytics config was disabled: %+v", got)
+	}
+}
+
 func TestURLTagPaginateAndSearch(t *testing.T) {
 	if got := core.CanonicalURL("https://x.com/repo", "/repo/post/a"); got != "https://x.com/repo/post/a" {
 		t.Fatalf("unexpected canonical: %s", got)
@@ -76,7 +90,7 @@ func TestURLTagPaginateAndSearch(t *testing.T) {
 	}
 
 	posts := []core.Post{
-		{Slug: "a", Tags: []string{"Go", "Tag"}, Date: time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC), Markdown: "# A", Content: "# A", DateDisplay: "2026-03-01"},
+		{Slug: "a", Category: "算法竞赛", Tags: []string{"Go", "Tag"}, Date: time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC), Markdown: "# A", Content: "# A", DateDisplay: "2026-03-01"},
 		{Slug: "b", Tags: []string{"go", "Tag", "Tag 2"}, Date: time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC), Markdown: "B", Content: "B", DateDisplay: "2026-02-01"},
 	}
 	stats := core.BuildTagStats(posts, "/repo", "dynamic")
@@ -90,6 +104,9 @@ func TestURLTagPaginateAndSearch(t *testing.T) {
 	filtered := core.FilterPostsByTag(posts, "go")
 	if len(filtered) != 2 {
 		t.Fatalf("filter failed: %+v", filtered)
+	}
+	if filtered = core.FilterPostsByTag(posts, "算法竞赛"); len(filtered) != 1 || filtered[0].Slug != "a" {
+		t.Fatalf("category filter failed: %+v", filtered)
 	}
 
 	groups := core.BuildArchiveGroups(posts)
@@ -215,6 +232,9 @@ tags: ["HTML"]
 	if got := core.SlugifyTag("  C++  "); got != "c" {
 		t.Fatalf("unexpected SlugifyTag: %s", got)
 	}
+	if got := core.SlugifyTag("  并行 计算  "); got != "并行-计算" {
+		t.Fatalf("unexpected Unicode SlugifyTag: %s", got)
+	}
 	if got := core.NormalizeThemeName("bad/theme"); got != "default" {
 		t.Fatalf("unexpected NormalizeThemeName: %s", got)
 	}
@@ -233,7 +253,7 @@ tags: ["HTML"]
 	}
 }
 
-func TestLoadPostRendersReferenceLinksAndIndentedLists(t *testing.T) {
+func TestLoadPostRendersCommonMarkReferencesAndNestedLists(t *testing.T) {
 	tmp := t.TempDir()
 	postPath := filepath.Join(tmp, "sample.md")
 	mustWriteFile(t, postPath, `---
@@ -266,15 +286,91 @@ draft: false
 	html := strings.Join(strings.Fields(string(post.HTML)), " ")
 	checks := []string{
 		`<a href="https://example.com/doc">文档</a>`,
-		`<li><p>外层条目</p> <p>对齐段落</p> <p>1. 这行应当按续行保留，而不是子列表</p></li>`,
-		`<li><p>含缩进列表</p> <p>2. 子条目说明</p> <ul>`,
-		`<li><p>子子条目</p></li>`,
-		`<section class="references"> <h2>参考文献</h2> <ul> <li><span class="reference-label">[ref]</span> <a href="https://example.com/doc">https://example.com/doc</a></li> </ul> </section>`,
+		`<li> <p>外层条目</p> <p>对齐段落</p> <ol> <li>这行应当按续行保留，而不是子列表</li> </ol> </li>`,
+		`<li> <p>含缩进列表</p> <ol start="2">`,
+		`<li>子子条目</li>`,
 	}
 	for _, check := range checks {
 		if !strings.Contains(html, check) {
 			t.Fatalf("expected html to contain %q, got: %s", check, html)
 		}
+	}
+}
+
+func TestMarkdownRendersGFMAndPreservesLatex(t *testing.T) {
+	tmp := t.TempDir()
+	postPath := filepath.Join(tmp, "math.md")
+	mustWriteFile(t, postPath, `---
+title: "Math"
+category: "算法竞赛"
+tags: ["数学", "图论"]
+---
+
+| A | B |
+| - | - |
+| 1 | 2 |
+
+- [x] done
+
+Inline $a_b + c^2$ and $x<y$.
+
+$$
+\frac{x_1}{y_2}
+$$
+
+![图](<./images/含 空格/demo.png>)
+`)
+
+	post, err := core.LoadPost(postPath, "fallback")
+	if err != nil {
+		t.Fatalf("LoadPost error: %v", err)
+	}
+	html := string(post.HTML)
+	for _, want := range []string{"<table>", `type="checkbox"`, `\(a_b + c^2\)`, `\(x&lt;y\)`, `\[`, `\frac{x_1}{y_2}`} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("expected rendered markdown to contain %q, got: %s", want, html)
+		}
+	}
+	if strings.Contains(html, "<em>b</em>") {
+		t.Fatalf("LaTeX underscore was parsed as Markdown emphasis: %s", html)
+	}
+	if post.Category != "算法竞赛" {
+		t.Fatalf("category was not parsed: %+v", post)
+	}
+
+	rendered := core.PreparePostForRender(post, "/blog")
+	if !strings.Contains(string(rendered.HTML), `/blog/images/%E5%90%AB%20%E7%A9%BA%E6%A0%BC/demo.png`) {
+		t.Fatalf("markdown image URL was not rewritten: %s", rendered.HTML)
+	}
+}
+
+func TestStandaloneHTMLGetsBlogIntegrations(t *testing.T) {
+	cfg := core.DefaultConfig()
+	cfg.CommentsProvider = "utterances"
+	cfg.CommentsRepo = "owner/repo"
+	cfg.AnalyticsProvider = "goatcounter"
+	cfg.AnalyticsEndpoint = "https://example.goatcounter.com/count"
+	post := core.Post{
+		Slug:    "html-post",
+		Format:  "html",
+		RawHTML: `<!doctype html><html><head><title>X</title></head><body><p>$a_b$</p></body></html>`,
+		HTML:    `<p>$a_b$</p>`,
+	}
+
+	doc := core.PrepareStandalonePostDocument(post, "/blog", cfg)
+	for _, want := range []string{"folio-integrations", "/blog/static/vendor/mathjax/tex-svg.js", "/blog/static/site.js", "data-like-button", "utteranc.es/client.js", "example.goatcounter.com/count"} {
+		if !strings.Contains(doc, want) {
+			t.Fatalf("expected standalone HTML to contain %q", want)
+		}
+	}
+	if strings.Count(doc, "folio-extras") < 1 {
+		t.Fatalf("standalone integration footer missing: %s", doc)
+	}
+
+	post.RawHTML = `<!doctype html><html><head></head><body><mjx-container>done</mjx-container></body></html>`
+	doc = core.PrepareStandalonePostDocument(post, "", cfg)
+	if strings.Contains(doc, "tex-svg.js") {
+		t.Fatalf("pre-rendered MathJax document should not load a second renderer")
 	}
 }
 

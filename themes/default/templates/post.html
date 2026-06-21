@@ -16,7 +16,7 @@
       }
     };
   </script>
-  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+  <script defer src="{{.BasePath}}/static/vendor/mathjax/tex-svg.js"></script>
 </head>
 <body class="page-post">
   <main class="container">
@@ -24,7 +24,7 @@
     <article class="post-detail">
       <header>
         <h1>{{.Post.Title}}</h1>
-        <p class="meta">{{.Post.DateDisplay}}{{if .Post.Author}} &middot; {{.Post.Author}}{{end}}</p>
+        <p class="meta">{{.Post.DateDisplay}}{{if .Post.Author}} &middot; {{.Post.Author}}{{end}}{{if .Post.Category}} &middot; <a class="category-link" href="{{tagURL .Post.Category}}">{{.Post.Category}}</a>{{end}}</p>
         {{if .Post.Tags}}
         <p class="tags">
           {{range .Post.Tags}}
@@ -34,6 +34,15 @@
         {{end}}
       </header>
       <section class="content">{{.Post.HTML}}</section>
+      {{if .Analytics.Enabled}}
+      <footer class="post-engagement" aria-label="文章互动">
+        <button type="button" class="like-button" data-like-button data-like-path="{{.Post.Slug}}" aria-pressed="false">
+          <span data-like-icon aria-hidden="true">♡</span> <span data-like-label>喜欢这篇文章</span>
+        </button>
+        <span class="meta">本文浏览 <strong data-page-view-count></strong></span>
+        <span class="meta">点赞 <strong data-like-count data-like-path="{{.Post.Slug}}"></strong></span>
+      </footer>
+      {{end}}
     </article>
 
     {{if .Comments.Enabled}}

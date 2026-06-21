@@ -127,6 +127,7 @@ func TestServerMainRoutesSmoke(t *testing.T) {
 		{"/static/not-found.css", http.StatusNotFound},
 		{"/static/../config.json", http.StatusNotFound},
 		{"/static/style.css", http.StatusOK},
+		{"/static/vendor/mathjax/tex-svg.js", http.StatusOK},
 		{sampleImagePath, http.StatusOK},
 		{"/not-found-page", http.StatusNotFound},
 	}

@@ -2,6 +2,7 @@ param(
   [string]$Message = "",
   [string]$Remote = "origin",
   [string]$Branch = "blog",
+  [switch]$SkipAI,
   [switch]$SkipTests,
   [switch]$SkipBuild
 )
@@ -31,6 +32,9 @@ try {
   Invoke-Checked "Checking git repository" { git rev-parse --is-inside-work-tree | Out-Null }
 
   $currentBranch = (git rev-parse --abbrev-ref HEAD).Trim()
+  if (-not $SkipAI) {
+    Invoke-Checked "Classifying changed posts with Codex" { & (Join-Path $PSScriptRoot "classify-posts.ps1") }
+  }
   if (-not $SkipTests) {
     Invoke-Checked "Running tests" { go test ./... }
   }

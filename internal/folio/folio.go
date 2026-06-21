@@ -1,7 +1,6 @@
 package folio
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/json"
 	"errors"
@@ -16,6 +15,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode"
 )
 
 type Post struct {
@@ -25,6 +25,7 @@ type Post struct {
 	Date        time.Time
 	DateDisplay string
 	Tags        []string
+	Category    string
 	Draft       bool
 	Format      string
 	Content     string
@@ -34,11 +35,12 @@ type Post struct {
 }
 
 type SearchDoc struct {
-	Title   string   `json:"title"`
-	Slug    string   `json:"slug"`
-	Date    string   `json:"date"`
-	Tags    []string `json:"tags"`
-	Content string   `json:"content"`
+	Title    string   `json:"title"`
+	Slug     string   `json:"slug"`
+	Date     string   `json:"date"`
+	Tags     []string `json:"tags"`
+	Category string   `json:"category,omitempty"`
+	Content  string   `json:"content"`
 }
 
 type SEO struct {
@@ -71,6 +73,9 @@ type AppConfig struct {
 	CommentsLang       string `json:"comments_lang"`
 	CommentsLabel      string `json:"comments_label"`
 	CommentsIssueTerm  string `json:"comments_issue_term"`
+	AnalyticsProvider  string `json:"analytics_provider"`
+	AnalyticsEndpoint  string `json:"analytics_endpoint"`
+	AnalyticsPublicURL string `json:"analytics_public_url"`
 }
 
 type TagStat struct {
@@ -85,11 +90,6 @@ type ArchiveGroup struct {
 }
 
 var (
-	reLink          = regexp.MustCompile(`\[(.+?)\]\(([^)\s]+)\)`)
-	reReferenceLink = regexp.MustCompile(`\[([^\[\]]+)\]\[([^\[\]]+)\]`)
-	reBold          = regexp.MustCompile(`\*\*(.+?)\*\*`)
-	reItalic        = regexp.MustCompile(`\*(.+?)\*`)
-	reCode          = regexp.MustCompile("`([^`]+)`")
 	reHTMLBody      = regexp.MustCompile(`(?is)<body\b[^>]*>(.*)</body>`)
 	reHTMLTitle     = regexp.MustCompile(`(?is)<title\b[^>]*>(.*?)</title>`)
 	reHTMLH1        = regexp.MustCompile(`(?is)<h1\b[^>]*>(.*?)</h1>`)
@@ -101,24 +101,6 @@ var (
 )
 
 var supportedPostExtensions = []string{".md", ".html"}
-
-type markdownReference struct {
-	Label string
-	URL   string
-}
-
-type markdownLine struct {
-	raw     string
-	indent  int
-	trimmed string
-}
-
-type markdownListItem struct {
-	tag         string
-	text        string
-	indent      int
-	markerWidth int
-}
 
 func DefaultConfig() AppConfig {
 	return AppConfig{
@@ -176,6 +158,9 @@ func (c *AppConfig) normalize() {
 	if strings.TrimSpace(c.CommentsIssueTerm) == "" {
 		c.CommentsIssueTerm = d.CommentsIssueTerm
 	}
+	c.AnalyticsProvider = strings.ToLower(strings.TrimSpace(c.AnalyticsProvider))
+	c.AnalyticsEndpoint = strings.TrimSpace(c.AnalyticsEndpoint)
+	c.AnalyticsPublicURL = strings.TrimSpace(c.AnalyticsPublicURL)
 }
 
 func LoadConfig(path string) (AppConfig, error) {
@@ -276,7 +261,7 @@ func BuildTagURL(basePath, tag, mode string) string {
 func BuildTagStats(posts []Post, basePath, mode string) []TagStat {
 	counts := map[string]int{}
 	for _, post := range posts {
-		for _, tag := range post.Tags {
+		for _, tag := range postTaxonomy(post) {
 			tag = strings.TrimSpace(tag)
 			if tag == "" {
 				continue
@@ -301,7 +286,7 @@ func BuildTagStats(posts []Post, basePath, mode string) []TagStat {
 func BuildStaticTagStats(posts []Post, basePath string) ([]TagStat, map[string]string, map[string]string) {
 	counts := map[string]int{}
 	for _, post := range posts {
-		for _, tag := range post.Tags {
+		for _, tag := range postTaxonomy(post) {
 			tag = strings.TrimSpace(tag)
 			if tag == "" {
 				continue
@@ -351,7 +336,7 @@ func FilterPostsByTag(posts []Post, target string) []Post {
 	}
 	out := make([]Post, 0)
 	for _, post := range posts {
-		for _, tag := range post.Tags {
+		for _, tag := range postTaxonomy(post) {
 			if strings.EqualFold(strings.TrimSpace(tag), target) {
 				out = append(out, post)
 				break
@@ -359,6 +344,21 @@ func FilterPostsByTag(posts []Post, target string) []Post {
 		}
 	}
 	return out
+}
+
+func postTaxonomy(post Post) []string {
+	values := make([]string, 0, len(post.Tags)+1)
+	if category := strings.TrimSpace(post.Category); category != "" {
+		values = append(values, category)
+	}
+	for _, tag := range post.Tags {
+		tag = strings.TrimSpace(tag)
+		if tag == "" || (len(values) > 0 && strings.EqualFold(values[0], tag)) {
+			continue
+		}
+		values = append(values, tag)
+	}
+	return values
 }
 
 func BuildArchiveGroups(posts []Post) []ArchiveGroup {
@@ -428,6 +428,23 @@ func BuildCommentConfig(cfg AppConfig, post Post) CommentConfig {
 	}
 }
 
+func BuildAnalyticsConfig(cfg AppConfig) AnalyticsConfig {
+	provider := strings.ToLower(strings.TrimSpace(cfg.AnalyticsProvider))
+	endpoint := strings.TrimSpace(cfg.AnalyticsEndpoint)
+	if provider != "goatcounter" || endpoint == "" {
+		return AnalyticsConfig{}
+	}
+	if parsed, err := url.Parse(endpoint); err != nil || parsed.Scheme != "https" || parsed.Host == "" {
+		return AnalyticsConfig{}
+	}
+	return AnalyticsConfig{
+		Enabled:   true,
+		Provider:  provider,
+		Endpoint:  endpoint,
+		PublicURL: strings.TrimSpace(cfg.AnalyticsPublicURL),
+	}
+}
+
 func PaginatePosts(posts []Post, page, perPage int) ([]Post, int, int) {
 	if perPage <= 0 {
 		perPage = 10
@@ -461,11 +478,12 @@ func MakeSearchDocs(posts []Post) []SearchDoc {
 			content = post.Markdown
 		}
 		docs = append(docs, SearchDoc{
-			Title:   post.Title,
-			Slug:    post.Slug,
-			Date:    post.DateDisplay,
-			Tags:    post.Tags,
-			Content: NormalizeSearchText(content),
+			Title:    post.Title,
+			Slug:     post.Slug,
+			Date:     post.DateDisplay,
+			Tags:     post.Tags,
+			Category: post.Category,
+			Content:  NormalizeSearchText(content),
 		})
 	}
 	return docs
@@ -536,12 +554,13 @@ func LoadPost(path, fallbackAuthor string) (Post, error) {
 	}
 
 	post := Post{
-		Slug:   slug,
-		Title:  fallbackTitle(title, slug),
-		Author: fallbackAuthorName(fm["author"], fallbackAuthor),
-		Tags:   parseList(fm["tags"]),
-		Draft:  strings.EqualFold(strings.TrimSpace(fm["draft"]), "true"),
-		Format: format,
+		Slug:     slug,
+		Title:    fallbackTitle(title, slug),
+		Author:   fallbackAuthorName(fm["author"], fallbackAuthor),
+		Tags:     parseList(fm["tags"]),
+		Category: strings.TrimSpace(fm["category"]),
+		Draft:    strings.EqualFold(strings.TrimSpace(fm["draft"]), "true"),
+		Format:   format,
 	}
 
 	post.Date = parseDateOrFallback(fm["date"], info.ModTime())
@@ -555,7 +574,7 @@ func LoadPost(path, fallbackAuthor string) (Post, error) {
 	default:
 		post.Markdown = body
 		post.Content = body
-		post.HTML = template.HTML(renderMarkdown(post.Markdown))
+		post.HTML = template.HTML(renderMarkdownGoldmark(post.Markdown))
 	}
 	return post, nil
 }
@@ -648,7 +667,7 @@ func htmlToText(input string) string {
 }
 
 func PreparePostForRender(post Post, basePath string) Post {
-	if post.Format != "html" || post.HTML == "" {
+	if post.HTML == "" {
 		return post
 	}
 	post.HTML = template.HTML(rewriteHTMLAssetURLs(string(post.HTML), basePath))
@@ -678,6 +697,9 @@ func rewriteHTMLAssetURLs(input, basePath string) string {
 }
 
 func buildPostAssetURL(basePath, rel string) (string, bool) {
+	if decoded, err := url.PathUnescape(rel); err == nil {
+		rel = decoded
+	}
 	cleaned := path.Clean("/images/" + strings.TrimSpace(rel))
 	if !strings.HasPrefix(cleaned, "/images/") {
 		return "", false
@@ -707,7 +729,7 @@ func SlugifyTag(s string) string {
 	var b strings.Builder
 	lastDash := false
 	for _, r := range s {
-		isAlphaNum := (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9')
+		isAlphaNum := unicode.IsLetter(r) || unicode.IsNumber(r)
 		if isAlphaNum {
 			b.WriteRune(r)
 			lastDash = false
@@ -843,7 +865,9 @@ func fallbackTitle(title, slug string) string {
 		if parts[i] == "" {
 			continue
 		}
-		parts[i] = strings.ToUpper(parts[i][:1]) + parts[i][1:]
+		runes := []rune(parts[i])
+		runes[0] = unicode.ToUpper(runes[0])
+		parts[i] = string(runes)
 	}
 	return strings.Join(parts, " ")
 }
@@ -854,371 +878,4 @@ func fallbackAuthorName(author, fallback string) string {
 		return author
 	}
 	return strings.TrimSpace(fallback)
-}
-
-func renderMarkdown(input string) string {
-	if strings.TrimSpace(input) == "" {
-		return ""
-	}
-
-	lines, refs, refLookup := parseMarkdownDocument(input)
-	var out strings.Builder
-	idx := 0
-	renderMarkdownBlocks(&out, lines, &idx, 0, refLookup)
-	renderReferenceSection(&out, refs)
-	return out.String()
-}
-
-func parseMarkdownDocument(input string) ([]markdownLine, []markdownReference, map[string]string) {
-	scanner := bufio.NewScanner(strings.NewReader(strings.ReplaceAll(input, "\r\n", "\n")))
-	lines := make([]markdownLine, 0)
-	refs := make([]markdownReference, 0)
-	refLookup := make(map[string]string)
-	inCode := false
-
-	for scanner.Scan() {
-		raw := scanner.Text()
-		trimmed := strings.TrimSpace(raw)
-		if strings.HasPrefix(trimmed, "```") {
-			inCode = !inCode
-			lines = append(lines, newMarkdownLine(raw))
-			continue
-		}
-		if !inCode {
-			if label, href, ok := parseReferenceDefinition(trimmed); ok {
-				key := normalizeReferenceLabel(label)
-				if _, exists := refLookup[key]; !exists {
-					refs = append(refs, markdownReference{
-						Label: strings.TrimSpace(label),
-						URL:   href,
-					})
-				}
-				refLookup[key] = href
-				continue
-			}
-		}
-		lines = append(lines, newMarkdownLine(raw))
-	}
-
-	return lines, refs, refLookup
-}
-
-func newMarkdownLine(raw string) markdownLine {
-	return markdownLine{
-		raw:     raw,
-		indent:  leadingIndentWidth(raw),
-		trimmed: strings.TrimSpace(raw),
-	}
-}
-
-func leadingIndentWidth(s string) int {
-	width := 0
-	for _, r := range s {
-		switch r {
-		case ' ':
-			width++
-		case '\t':
-			width += 4
-		default:
-			return width
-		}
-	}
-	return width
-}
-
-func stripIndent(s string, width int) string {
-	if width <= 0 {
-		return s
-	}
-	idx := 0
-	used := 0
-	for idx < len(s) && used < width {
-		switch s[idx] {
-		case ' ':
-			used++
-			idx++
-		case '\t':
-			used += 4
-			idx++
-		default:
-			return s[idx:]
-		}
-	}
-	return s[idx:]
-}
-
-func parseReferenceDefinition(line string) (label, href string, ok bool) {
-	if !strings.HasPrefix(line, "[") {
-		return "", "", false
-	}
-	end := strings.Index(line, "]:")
-	if end <= 1 {
-		return "", "", false
-	}
-	label = strings.TrimSpace(line[1:end])
-	rest := strings.TrimSpace(line[end+2:])
-	if label == "" || rest == "" {
-		return "", "", false
-	}
-	if strings.HasPrefix(rest, "<") {
-		close := strings.Index(rest, ">")
-		if close <= 1 {
-			return "", "", false
-		}
-		href = rest[1:close]
-	} else {
-		fields := strings.Fields(rest)
-		if len(fields) == 0 {
-			return "", "", false
-		}
-		href = fields[0]
-	}
-	if href == "" {
-		return "", "", false
-	}
-	return label, href, true
-}
-
-func normalizeReferenceLabel(label string) string {
-	return strings.ToLower(strings.Join(strings.Fields(strings.TrimSpace(label)), " "))
-}
-
-func renderMarkdownBlocks(out *strings.Builder, lines []markdownLine, idx *int, baseIndent int, refs map[string]string) {
-	var paragraph []string
-
-	flushParagraph := func() {
-		if len(paragraph) == 0 {
-			return
-		}
-		out.WriteString("<p>" + formatInline(strings.Join(paragraph, " "), refs) + "</p>\n")
-		paragraph = paragraph[:0]
-	}
-
-	for *idx < len(lines) {
-		line := lines[*idx]
-		if line.trimmed == "" {
-			flushParagraph()
-			*idx++
-			continue
-		}
-		if line.indent < baseIndent {
-			break
-		}
-
-		raw := stripIndent(line.raw, baseIndent)
-		trimmed := strings.TrimSpace(raw)
-
-		if strings.HasPrefix(trimmed, "```") {
-			flushParagraph()
-			renderCodeBlock(out, lines, idx, baseIndent)
-			continue
-		}
-
-		if item, ok := parseListItem(raw); ok && (baseIndent == 0 || item.indent > 0) {
-			flushParagraph()
-			renderList(out, lines, idx, baseIndent, item.indent, item.tag, refs)
-			continue
-		}
-
-		if strings.HasPrefix(trimmed, "#") {
-			flushParagraph()
-			level := 0
-			for level < len(trimmed) && trimmed[level] == '#' {
-				level++
-			}
-			if level > 6 {
-				level = 6
-			}
-			text := strings.TrimSpace(trimmed[level:])
-			fmt.Fprintf(out, "<h%d>%s</h%d>\n", level, formatInline(text, refs), level)
-			*idx++
-			continue
-		}
-
-		if strings.HasPrefix(trimmed, ">") {
-			flushParagraph()
-			renderBlockquote(out, lines, idx, baseIndent, refs)
-			continue
-		}
-
-		paragraph = append(paragraph, trimmed)
-		*idx++
-	}
-
-	flushParagraph()
-}
-
-func renderCodeBlock(out *strings.Builder, lines []markdownLine, idx *int, baseIndent int) {
-	out.WriteString("<pre><code>")
-	*idx++
-	for *idx < len(lines) {
-		line := lines[*idx]
-		if line.indent >= baseIndent && strings.HasPrefix(strings.TrimSpace(stripIndent(line.raw, baseIndent)), "```") {
-			out.WriteString("</code></pre>\n")
-			*idx++
-			return
-		}
-		raw := line.raw
-		if line.trimmed != "" && line.indent >= baseIndent {
-			raw = stripIndent(line.raw, baseIndent)
-		} else if line.trimmed == "" {
-			raw = ""
-		}
-		out.WriteString(template.HTMLEscapeString(raw))
-		out.WriteString("\n")
-		*idx++
-	}
-	out.WriteString("</code></pre>\n")
-}
-
-func renderBlockquote(out *strings.Builder, lines []markdownLine, idx *int, baseIndent int, refs map[string]string) {
-	parts := make([]string, 0, 1)
-	for *idx < len(lines) {
-		line := lines[*idx]
-		if line.trimmed == "" || line.indent < baseIndent {
-			break
-		}
-		raw := stripIndent(line.raw, baseIndent)
-		trimmed := strings.TrimSpace(raw)
-		if !strings.HasPrefix(trimmed, ">") {
-			break
-		}
-		parts = append(parts, strings.TrimSpace(strings.TrimPrefix(trimmed, ">")))
-		*idx++
-	}
-	out.WriteString("<blockquote><p>" + formatInline(strings.Join(parts, " "), refs) + "</p></blockquote>\n")
-}
-
-func parseListItem(line string) (markdownListItem, bool) {
-	indent := leadingIndentWidth(line)
-	content := stripIndent(line, indent)
-
-	if strings.HasPrefix(content, "- ") || strings.HasPrefix(content, "* ") {
-		return markdownListItem{
-			tag:         "ul",
-			text:        strings.TrimSpace(content[2:]),
-			indent:      indent,
-			markerWidth: 2,
-		}, true
-	}
-
-	i := 0
-	for i < len(content) && content[i] >= '0' && content[i] <= '9' {
-		i++
-	}
-	if i > 0 && i+1 < len(content) && content[i] == '.' && content[i+1] == ' ' {
-		return markdownListItem{
-			tag:         "ol",
-			text:        strings.TrimSpace(content[i+2:]),
-			indent:      indent,
-			markerWidth: i + 2,
-		}, true
-	}
-
-	return markdownListItem{}, false
-}
-
-func renderList(out *strings.Builder, lines []markdownLine, idx *int, baseIndent, listIndent int, tag string, refs map[string]string) {
-	out.WriteString("<" + tag + ">\n")
-	for *idx < len(lines) {
-		line := lines[*idx]
-		if line.trimmed == "" {
-			*idx++
-			continue
-		}
-		if line.indent < baseIndent {
-			break
-		}
-
-		raw := stripIndent(line.raw, baseIndent)
-		item, ok := parseListItem(raw)
-		if !ok || item.indent != listIndent {
-			break
-		}
-		if item.tag != tag {
-			break
-		}
-
-		childIndent := item.indent + item.markerWidth
-		itemLines := make([]markdownLine, 0, 4)
-		if item.text != "" {
-			itemLines = append(itemLines, newMarkdownLine(strings.Repeat(" ", baseIndent+childIndent)+item.text))
-		}
-		*idx++
-
-		for *idx < len(lines) {
-			next := lines[*idx]
-			if next.trimmed == "" {
-				itemLines = append(itemLines, newMarkdownLine(""))
-				*idx++
-				continue
-			}
-			if next.indent < baseIndent {
-				break
-			}
-
-			nextRaw := stripIndent(next.raw, baseIndent)
-			nextIndent := leadingIndentWidth(nextRaw)
-			nextItem, nextIsItem := parseListItem(nextRaw)
-			if nextIsItem && nextItem.indent == listIndent {
-				break
-			}
-			if nextIndent < childIndent {
-				break
-			}
-
-			itemLines = append(itemLines, next)
-			*idx++
-		}
-
-		var itemOut strings.Builder
-		itemIdx := 0
-		renderMarkdownBlocks(&itemOut, itemLines, &itemIdx, baseIndent+childIndent, refs)
-
-		out.WriteString("<li>")
-		out.WriteString(strings.TrimSpace(itemOut.String()))
-		out.WriteString("</li>\n")
-	}
-	out.WriteString("</" + tag + ">\n")
-}
-
-func renderReferenceSection(out *strings.Builder, refs []markdownReference) {
-	if len(refs) == 0 {
-		return
-	}
-
-	out.WriteString("<section class=\"references\">\n")
-	out.WriteString("<h2>参考文献</h2>\n")
-	out.WriteString("<ul>\n")
-	for _, ref := range refs {
-		label := template.HTMLEscapeString(ref.Label)
-		href := template.HTMLEscapeString(ref.URL)
-		out.WriteString("<li><span class=\"reference-label\">[" + label + "]</span> <a href=\"" + href + "\">" + href + "</a></li>\n")
-	}
-	out.WriteString("</ul>\n")
-	out.WriteString("</section>\n")
-}
-
-func replaceReferenceLinks(s string, refs map[string]string) string {
-	return reReferenceLink.ReplaceAllStringFunc(s, func(match string) string {
-		parts := reReferenceLink.FindStringSubmatch(match)
-		if len(parts) != 3 {
-			return match
-		}
-		href, ok := refs[normalizeReferenceLabel(parts[2])]
-		if !ok {
-			return match
-		}
-		return `<a href="` + template.HTMLEscapeString(href) + `">` + parts[1] + `</a>`
-	})
-}
-
-func formatInline(s string, refs map[string]string) string {
-	out := template.HTMLEscapeString(s)
-	out = replaceReferenceLinks(out, refs)
-	out = reLink.ReplaceAllString(out, `<a href="$2">$1</a>`)
-	out = reBold.ReplaceAllString(out, `<strong>$1</strong>`)
-	out = reItalic.ReplaceAllString(out, `<em>$1</em>`)
-	out = reCode.ReplaceAllString(out, `<code>$1</code>`)
-	return out
 }

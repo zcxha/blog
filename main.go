@@ -118,6 +118,7 @@ func renderNotFound(w http.ResponseWriter, r *http.Request) {
 		FaviconPath:  faviconPath,
 		SEO:          core.MakeSEO(appConfig, "页面不存在 - "+appConfig.SiteTitle, "你访问的页面不存在或已移动。", r.URL.Path, "website", ""),
 		Message:      "你访问的页面不存在或已移动。",
+		Analytics:    core.BuildAnalyticsConfig(appConfig),
 	}
 	renderHTMLWithStatus(w, tpl, data, "404", http.StatusNotFound)
 }
@@ -162,6 +163,7 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 		SEO:             core.MakeSEO(appConfig, title, appConfig.SiteDescription, pathForSEO, "website", ""),
 		Posts:           visiblePosts,
 		Pagination:      core.BuildDynamicPagination("", currentPage, totalPages),
+		Analytics:       core.BuildAnalyticsConfig(appConfig),
 	}
 	renderHTML(w, tpl, data, "index")
 }
@@ -193,7 +195,7 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if post.Format == "html" {
-		renderRawHTML(w, core.PreparePostDocumentForRender(post, ""), http.StatusOK)
+		renderRawHTML(w, core.PrepareStandalonePostDocument(post, "", appConfig), http.StatusOK)
 		return
 	}
 
@@ -219,8 +221,9 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 			"article",
 			post.Date.Format(time.RFC3339),
 		),
-		Post:     post,
-		Comments: core.BuildCommentConfig(appConfig, post),
+		Post:      core.PreparePostForRender(post, ""),
+		Comments:  core.BuildCommentConfig(appConfig, post),
+		Analytics: core.BuildAnalyticsConfig(appConfig),
 	}
 	renderHTML(w, tpl, data, "post")
 }
@@ -280,6 +283,7 @@ func tagsHandler(w http.ResponseWriter, r *http.Request) {
 		Tags:         tagStats,
 		Posts:        visiblePosts,
 		Pagination:   core.BuildDynamicTagsPagination("", currentTag, currentPage, totalPages),
+		Analytics:    core.BuildAnalyticsConfig(appConfig),
 	}
 	renderHTML(w, tpl, data, "tags")
 }
@@ -319,6 +323,7 @@ func archivesHandler(w http.ResponseWriter, r *http.Request) {
 		SEO:          core.MakeSEO(appConfig, title+" - "+appConfig.SiteTitle, "按月份浏览历史文章。", core.DynamicArchivesPageURL("", currentPage), "website", ""),
 		Groups:       core.BuildArchiveGroups(visiblePosts),
 		Pagination:   core.BuildDynamicArchivesPagination("", currentPage, totalPages),
+		Analytics:    core.BuildAnalyticsConfig(appConfig),
 	}
 	renderHTML(w, tpl, data, "archives")
 }
@@ -343,6 +348,7 @@ func searchHandler(w http.ResponseWriter, r *http.Request) {
 		StylePath:    stylePath,
 		FaviconPath:  faviconPath,
 		SEO:          core.MakeSEO(appConfig, "搜索 - "+appConfig.SiteTitle, "在博客中搜索标题、标签和正文。", "/search", "website", ""),
+		Analytics:    core.BuildAnalyticsConfig(appConfig),
 	}
 	renderHTML(w, tpl, data, "search")
 }

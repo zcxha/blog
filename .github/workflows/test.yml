@@ -27,8 +27,5 @@ jobs:
           go-version-file: go.mod
           cache: false
 
-      - name: Setup golangci-lint
-        run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-
       - name: Run tests
         run: make test

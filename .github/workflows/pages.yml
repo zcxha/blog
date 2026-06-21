@@ -36,6 +36,9 @@ jobs:
             echo "PAGES_BASE_PATH=/${{ github.event.repository.name }}" >> "$GITHUB_ENV"
           fi
 
+      - name: Test renderer and content
+        run: go test ./...
+
       - name: Build static site
         run: go run ./cmd/build -out dist -base-path "${PAGES_BASE_PATH}"
 

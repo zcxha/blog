@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["posts"],
+  "properties": {
+    "posts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "category", "tags"],
+        "properties": {
+          "id": { "type": "integer", "minimum": 0 },
+          "category": { "type": "string", "minLength": 1, "maxLength": 24 },
+          "tags": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 6,
+            "items": { "type": "string", "minLength": 1, "maxLength": 32 }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,7 +1,7 @@
 ﻿{
   "site_title": "zcxha",
   "site_description": "博客",
-  "site_url": "https://zcxha.github.io/dev-blog",
+  "site_url": "https://zcxha.github.io/blog",
   "author_name": "zcxha",
   "author_github": "https://github.com/zcxha",
   "theme": "default",
@@ -9,8 +9,11 @@
   "default_og_image": "",
   "default_og_type": "website",
   "comments_provider": "utterances",
-  "comments_repo": "zcxha/dev-blog",
+  "comments_repo": "zcxha/blog",
   "comments_issue_term": "pathname",
   "comments_label": "comment",
-  "comments_theme": "github-light"
+  "comments_theme": "github-light",
+  "analytics_provider": "goatcounter",
+  "analytics_endpoint": "",
+  "analytics_public_url": ""
 }

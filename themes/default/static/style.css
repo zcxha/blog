@@ -82,6 +82,12 @@ body {
   margin: 2px 0 20px;
 }
 
+.nav-stat {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .top-nav a,
 .back-nav a,
 .page-btn,
@@ -237,6 +243,11 @@ body.page-search .back-nav a:nth-child(4) {
 
 .content p {
   margin: 12px 0;
+}
+
+.category-link {
+  color: inherit;
+  text-underline-offset: 3px;
 }
 
 .content img,
@@ -445,6 +456,39 @@ mark {
   border-top: 1px solid var(--line);
 }
 
+.post-engagement {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  margin-top: 28px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.like-button {
+  appearance: none;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  padding: 9px 14px;
+  transition: border-color 160ms var(--ease), color 160ms var(--ease), transform 160ms var(--ease);
+}
+
+.like-button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.like-button.is-liked {
+  border-color: #d55b78;
+  color: #b92f54;
+}
+
 .empty {
   border: 1px dashed var(--line-strong);
   border-radius: 12px;
@@ -469,6 +513,11 @@ mark {
 
   .post-card h2 {
     font-size: clamp(20px, 8vw, 26px);
+  }
+
+  .nav-stat {
+    width: 100%;
+    margin-left: 0;
   }
 }
 

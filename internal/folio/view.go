@@ -17,6 +17,7 @@ type IndexPageData struct {
 	SEO             SEO
 	Posts           []Post
 	Pagination      Pagination
+	Analytics       AnalyticsConfig
 }
 
 type PostPageData struct {
@@ -28,6 +29,7 @@ type PostPageData struct {
 	SEO          SEO
 	Post         Post
 	Comments     CommentConfig
+	Analytics    AnalyticsConfig
 }
 
 type TagsPageData struct {
@@ -41,6 +43,7 @@ type TagsPageData struct {
 	Tags         []TagStat
 	Posts        []Post
 	Pagination   Pagination
+	Analytics    AnalyticsConfig
 }
 
 type ArchivesPageData struct {
@@ -52,6 +55,7 @@ type ArchivesPageData struct {
 	SEO          SEO
 	Groups       []ArchiveGroup
 	Pagination   Pagination
+	Analytics    AnalyticsConfig
 }
 
 type SearchPageData struct {
@@ -61,6 +65,7 @@ type SearchPageData struct {
 	StylePath    string
 	FaviconPath  string
 	SEO          SEO
+	Analytics    AnalyticsConfig
 }
 
 type NotFoundPageData struct {
@@ -71,6 +76,7 @@ type NotFoundPageData struct {
 	FaviconPath  string
 	SEO          SEO
 	Message      string
+	Analytics    AnalyticsConfig
 }
 
 type PageLink struct {
@@ -100,6 +106,13 @@ type CommentConfig struct {
 	Label          string
 	IssueTerm      string
 	DiscussionTerm string
+}
+
+type AnalyticsConfig struct {
+	Enabled   bool
+	Provider  string
+	Endpoint  string
+	PublicURL string
 }
 
 func ParseTemplate(theme, pageRel string, tagResolver func(string) string) (*template.Template, error) {

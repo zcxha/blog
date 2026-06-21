@@ -4,6 +4,8 @@
   <a href="{{.BasePath}}/tags">标签</a>
   <a href="{{.BasePath}}/archives">归档</a>
   <a href="{{.BasePath}}/search">搜索</a>
+  {{if .Analytics.Enabled}}<span class="nav-stat">全站浏览 <strong data-site-view-count></strong></span>{{end}}
+  {{if .Analytics.PublicURL}}<a href="{{.Analytics.PublicURL}}" target="_blank" rel="noopener noreferrer">统计</a>{{end}}
   {{if .AuthorGitHub}}
   <a class="github-dot" href="{{.AuthorGitHub}}" target="_blank" rel="noopener noreferrer" aria-label="作者 GitHub">
     <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -20,6 +22,8 @@
   <a href="{{.BasePath}}/tags">标签</a>
   <a href="{{.BasePath}}/archives">归档</a>
   <a href="{{.BasePath}}/search">搜索</a>
+  {{if .Analytics.Enabled}}<span class="nav-stat">全站浏览 <strong data-site-view-count></strong></span>{{end}}
+  {{if .Analytics.PublicURL}}<a href="{{.Analytics.PublicURL}}" target="_blank" rel="noopener noreferrer">统计</a>{{end}}
   {{if .AuthorGitHub}}
   <a class="github-dot" href="{{.AuthorGitHub}}" target="_blank" rel="noopener noreferrer" aria-label="作者 GitHub">
     <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">

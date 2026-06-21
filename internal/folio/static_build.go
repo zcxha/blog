@@ -49,6 +49,7 @@ func BuildStaticSite(opts BuildOptions) error {
 	}
 
 	tagStats, tagSlugs, tagURLs := BuildStaticTagStats(posts, opts.BasePath)
+	analytics := BuildAnalyticsConfig(cfg)
 
 	if err := os.RemoveAll(opts.OutDir); err != nil {
 		return err
@@ -106,6 +107,7 @@ func BuildStaticSite(opts BuildOptions) error {
 			SEO:             MakeSEO(cfg, pageTitle, cfg.SiteDescription, pagePathForSEO, "website", ""),
 			Posts:           pagePosts,
 			Pagination:      BuildStaticPagination(opts.BasePath, currentPage, totalPages),
+			Analytics:       analytics,
 		}); err != nil {
 			return err
 		}
@@ -128,6 +130,7 @@ func BuildStaticSite(opts BuildOptions) error {
 			SEO:          MakeSEO(cfg, pageTitle+" - "+cfg.SiteTitle, "按月份浏览历史文章。", StaticArchivesPageURL(opts.BasePath, currentPage), "website", ""),
 			Groups:       BuildArchiveGroups(pagePosts),
 			Pagination:   BuildStaticArchivesPagination(opts.BasePath, currentPage, totalArchivePages),
+			Analytics:    analytics,
 		}); err != nil {
 			return err
 		}
@@ -140,6 +143,7 @@ func BuildStaticSite(opts BuildOptions) error {
 		StylePath:    stylePath,
 		FaviconPath:  faviconPath,
 		SEO:          MakeSEO(cfg, "搜索 - "+cfg.SiteTitle, "在博客中搜索标题、标签和正文。", WithBase(opts.BasePath, "/search"), "website", ""),
+		Analytics:    analytics,
 	}); err != nil {
 		return err
 	}
@@ -167,6 +171,7 @@ func BuildStaticSite(opts BuildOptions) error {
 			Tags:         tagStats,
 			Posts:        pagePosts,
 			Pagination:   BuildStaticTagsPagination(opts.BasePath, "", currentPage, totalTagPages),
+			Analytics:    analytics,
 		}); err != nil {
 			return err
 		}
@@ -195,6 +200,7 @@ func BuildStaticSite(opts BuildOptions) error {
 				Tags:         tagStats,
 				Posts:        pagePosts,
 				Pagination:   BuildStaticTagsPagination(opts.BasePath, slug, currentPage, totalTagPagesForCurrent),
+				Analytics:    analytics,
 			}); err != nil {
 				return err
 			}
@@ -204,7 +210,7 @@ func BuildStaticSite(opts BuildOptions) error {
 	for _, post := range posts {
 		outPath := filepath.Join(opts.OutDir, "post", post.Slug, "index.html")
 		if post.Format == "html" {
-			if err := writeBuildString(outPath, PreparePostDocumentForRender(post, opts.BasePath)); err != nil {
+			if err := writeBuildString(outPath, PrepareStandalonePostDocument(post, opts.BasePath, cfg)); err != nil {
 				return err
 			}
 			continue
@@ -220,6 +226,7 @@ func BuildStaticSite(opts BuildOptions) error {
 			SEO:          MakeSEO(cfg, post.Title+" - "+cfg.SiteTitle, Excerpt(post.Content, 140), WithBase(opts.BasePath, "/post/"+post.Slug+"/"), "article", post.Date.Format(time.RFC3339)),
 			Post:         renderPost,
 			Comments:     BuildCommentConfig(cfg, post),
+			Analytics:    analytics,
 		}); err != nil {
 			return err
 		}
@@ -233,11 +240,12 @@ func BuildStaticSite(opts BuildOptions) error {
 		FaviconPath:  faviconPath,
 		SEO:          MakeSEO(cfg, "页面不存在 - "+cfg.SiteTitle, "你访问的页面不存在或已移动。", WithBase(opts.BasePath, "/404.html"), "website", ""),
 		Message:      "你访问的页面不存在或已移动。",
+		Analytics:    analytics,
 	}); err != nil {
 		return err
 	}
 
-	return nil
+	return ValidateStaticSite(opts.OutDir, opts.BasePath)
 }
 
 func writeBuildJSON(path string, v any) (err error) {
