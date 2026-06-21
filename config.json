@@ -14,6 +14,6 @@
   "comments_label": "comment",
   "comments_theme": "github-light",
   "analytics_provider": "goatcounter",
-  "analytics_endpoint": "",
-  "analytics_public_url": ""
+  "analytics_endpoint": "https://zcxha.goatcounter.com/count",
+  "analytics_public_url": "https://zcxha.goatcounter.com"
 }
