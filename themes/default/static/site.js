@@ -2,23 +2,50 @@
   "use strict";
 
   const storageKey = (path) => `folio:liked:${path}`;
-  let counterSequence = 0;
+  const countRequests = new Map();
 
-  const appendCount = (element, path) => {
-    const id = `folio-counter-${counterSequence++}`;
-    element.id = id;
-    element.textContent = "";
-    window.goatcounter.visit_count({ append: `#${id}`, type: "html", ...(path ? { path } : {}) });
+  const goatCounterBaseURL = () => {
+    const script = document.querySelector("script[data-goatcounter]");
+    const endpoint = script?.dataset.goatcounter || window.goatcounter?.endpoint || "";
+    return endpoint.replace(/\/count\/?$/, "/counter/");
   };
 
-  const loadVisibleCounts = (attempt = 0) => {
-    if (!window.goatcounter || typeof window.goatcounter.visit_count !== "function") {
-      if (attempt < 40) window.setTimeout(() => loadVisibleCounts(attempt + 1), 125);
-      return;
+  const currentPagePath = () => {
+    const canonical = document.querySelector('link[rel="canonical"][href]');
+    return canonical ? new URL(canonical.href, window.location.href).pathname : window.location.pathname;
+  };
+
+  const fetchCount = (path) => {
+    if (countRequests.has(path)) return countRequests.get(path);
+
+    const baseURL = goatCounterBaseURL();
+    const request = baseURL
+      ? fetch(`${baseURL}${encodeURIComponent(path)}.json`, { credentials: "omit" }).then(async (response) => {
+          if (response.status === 404) return "0";
+          if (!response.ok) throw new Error(`GoatCounter returned ${response.status}`);
+          const data = await response.json();
+          return String(data.count ?? data.count_unique ?? "0");
+        })
+      : Promise.reject(new Error("GoatCounter endpoint is not configured"));
+
+    countRequests.set(path, request);
+    return request;
+  };
+
+  const showCount = async (element, path) => {
+    element.textContent = "…";
+    try {
+      element.textContent = await fetchCount(path);
+    } catch (error) {
+      console.warn("folio: unable to load GoatCounter count", error);
+      element.textContent = "—";
     }
-    document.querySelectorAll("[data-site-view-count]").forEach((element) => appendCount(element, "TOTAL"));
-    document.querySelectorAll("[data-page-view-count]").forEach((element) => appendCount(element));
-    document.querySelectorAll("[data-like-count]").forEach((element) => appendCount(element, `like:${element.dataset.likePath}`));
+  };
+
+  const loadVisibleCounts = () => {
+    document.querySelectorAll("[data-site-view-count]").forEach((element) => showCount(element, "TOTAL"));
+    document.querySelectorAll("[data-page-view-count]").forEach((element) => showCount(element, currentPagePath()));
+    document.querySelectorAll("[data-like-count]").forEach((element) => showCount(element, `like:${element.dataset.likePath}`));
   };
 
   loadVisibleCounts();
