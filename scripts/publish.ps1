@@ -32,6 +32,8 @@ try {
   Invoke-Checked "Checking git repository" { git rev-parse --is-inside-work-tree | Out-Null }
 
   $currentBranch = (git rev-parse --abbrev-ref HEAD).Trim()
+  Invoke-Checked "Stamping missing HTML post dates" { & (Join-Path $PSScriptRoot "stamp-post-dates.ps1") -All }
+
   if (-not $SkipAI) {
     Invoke-Checked "Classifying changed posts with Codex" { & (Join-Path $PSScriptRoot "classify-posts.ps1") }
   }
